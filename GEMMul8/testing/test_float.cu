@@ -417,7 +417,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
         std::cout << std::scientific << maxerr << "," << mederr << "," << 2.0 * m * n * k / time * 1.e-12 << "," << time << ","
                   << "," << "," << "," << "," << std::endl;
 
-#if defined(cuMpSGEMM_FLAG)
+/*#if defined(cuMpSGEMM_FLAG)
         cumpsgemm::handle_t cuMpSGEMM_handle;
         cumpsgemm::create(cuMpSGEMM_handle);
         cudaDeviceSynchronize();
@@ -447,7 +447,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
                   << "," << "," << "," << "," << std::endl;
 
         cumpsgemm::destroy(cuMpSGEMM_handle);
-#endif
+#endif*/
 
         //--------------------
         // C := A*B by ozaki-scheme2

@@ -49,7 +49,7 @@ if(USE_CUMP)
     list(APPEND LIBS -L${CUMP_DIR}/build -lcumpsgemm)
 endif()
 
-link_directories(${CMAKE_SOURCE_DIR}/../lib)  # Add the path to the gemmul8 library
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib)  # Add the path to the gemmul8 library
 if(USE_OZIMMU_EF)
     link_directories(${OZIMMU_DIR}/build)  # Add the path to the ozIMMU_EF library
 endif()
@@ -61,6 +61,7 @@ endif()
 set(TEST_SOURCES
     test_double.cu
     test_float.cu
+    test_mixed.cu
 )
 
 foreach(TEST_SOURCE ${TEST_SOURCES})
@@ -71,7 +72,9 @@ foreach(TEST_SOURCE ${TEST_SOURCES})
     target_compile_options(${TEST_NAME} PRIVATE ${NVCC_FLAGS})
     
     # Link libraries
-    target_link_libraries(${TEST_NAME} PRIVATE ${LIBS})
+    target_link_libraries(${TEST_NAME} PRIVATE gemmul8_static ${LIBS})
+    # Do not forget to copy the file to the right location
+    add_dependencies(${TEST_NAME} copy_gemmul8)
 
     # Set the library path for runtime
     set_target_properties(${TEST_NAME} PROPERTIES

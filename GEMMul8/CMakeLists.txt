@@ -53,10 +53,18 @@ install(TARGETS gemmul8_static
 # )
 
 # Custom command to copy the static library to ./lib
-add_custom_command(TARGET gemmul8_static POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:gemmul8_static> ${CMAKE_SOURCE_DIR}/lib/libgemmul8.a
-        COMMENT "Copying libgemmul8.a to ./lib/"
+add_custom_command(
+    OUTPUT ${CMAKE_SOURCE_DIR}/lib/libgemmul8.a
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:gemmul8_static> ${CMAKE_SOURCE_DIR}/lib/libgemmul8.a
+        DEPENDS gemmul8_static
+    COMMENT "Copying libgemmul8.a to ./lib/"
 )
+
+# Create a custom target that depends on the custom command
+add_custom_target(copy_gemmul8 ALL DEPENDS ${CMAKE_SOURCE_DIR}/lib/libgemmul8.a)
+
+# Ensure that the custom target is built whenever a target that links against gemmul8_static is built:
+# Add `add_dependencies(my_target copy_gemmul8)`
 
 # Add Testing to be able to run it
 add_subdirectory("${PROJECT_SOURCE_DIR}/testing")

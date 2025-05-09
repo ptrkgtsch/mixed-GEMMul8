@@ -21,7 +21,7 @@
 #define AVERAGE    100
 #define SEED       123456
 #define PHI        0.5, 1, 2, 3, 4
-#define SIZE       1024, 2048, 4096, 8192,// 16384
+#define SIZE       1024, 2048, 4096, 8192//, 16384
 #define NUM_MODULI 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20
 
 #if defined(ozIMMU_EF_FLAG)
@@ -66,7 +66,7 @@ std::string getCurrentDateTime() {
 }
 
 void accuracy_check(std::string &deviceName, std::string &dateTime) {
-    std::string fileName = "oz2_results_d_accuracy_" + deviceName + "_" + dateTime + ".csv";
+    std::string fileName = "oz2_results_df_accuracy_" + deviceName + "_" + dateTime + ".csv";
     std::ofstream outFile(fileName);
     cublasHandle_t handle;
     cublasCreate(&handle);
@@ -89,7 +89,7 @@ void accuracy_check(std::string &deviceName, std::string &dateTime) {
     double *work_cpu            = new double[m * n * 3];
     size_t worksize             = gemmul8::workSize(m, n, k_max, num_moduli_max);
     void *work_gpu;
-    cudaMalloc(&work_gpu, (m * k_max + k_max * n + m * n * 2) * sizeof(double));
+    cudaMalloc(&work_gpu, (m * k_max + k_max * n + m * n * 2) * sizeof(double) + (k_max * n) * sizeof(float));
     cudaDeviceSynchronize();
     void *work_gemm;
     cudaMalloc(&work_gemm, worksize);
@@ -110,24 +110,24 @@ void accuracy_check(std::string &deviceName, std::string &dateTime) {
             double *cpuC1 = cpuC + m * n;
             double *cpuC2 = cpuC1 + m * n;
             double *devA  = reinterpret_cast<double *>(work_gpu);
-            double *devB  = devA + m * k;
-            double *devC  = devB + k * n;
+            float *devB  = reinterpret_cast<float *>(devA + m * k);
+            double *devBd = reinterpret_cast<double *>(devB + k * n);
+            double *devC  = devBd + k * n;
             double *devC1 = devC;
             double *devC2 = devC1 + m * n;
             double errmax, errmed;
-            std::vector<double> err_OS2_fast;
-            std::vector<double> err_OS2_accu;
 
             //--------------------
             // generate matrices
             //--------------------
             makemat::randmat<double>(m, k, devA, phi, seed);
-            makemat::randmat<double>(k, n, devB, phi, seed);
+            makemat::randmat<float>(k, n, devB, phi, seed);
 
             //--------------------
             // C1+C2 := A*B (double-double arithmetic)
             //--------------------
-            eval::dd_gpu::simple_gemm(m, n, k, devA, devB, devC1, devC2);
+            makemat::f2d(k, n, devB, devBd);
+            eval::dd_gpu::simple_gemm(m, n, k, devA, devBd, devC1, devC2);
             cudaDeviceSynchronize();
             cudaMemcpy(cpuC1, devC1, m * n * sizeof(double), cudaMemcpyDeviceToHost);
             cudaMemcpy(cpuC2, devC2, m * n * sizeof(double), cudaMemcpyDeviceToHost);
@@ -138,14 +138,14 @@ void accuracy_check(std::string &deviceName, std::string &dateTime) {
             double alpha = 1.0;
             double beta  = 0.0;
             cudaDeviceSynchronize();
-            cublasGemmEx(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, CUDA_R_64F, m, devB, CUDA_R_64F, k, &beta, devC, CUDA_R_64F, m, CUBLAS_COMPUTE_64F, CUBLAS_GEMM_DEFAULT);
+            cublasGemmEx(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, CUDA_R_64F, m, devBd, CUDA_R_64F, k, &beta, devC, CUDA_R_64F, m, CUBLAS_COMPUTE_64F, CUBLAS_GEMM_DEFAULT);
             cudaDeviceSynchronize();
             cudaMemcpy(cpuC, devC, m * n * sizeof(double), cudaMemcpyDeviceToHost);
             cudaDeviceSynchronize();
             eval::err::gemm_err(m, n, cpuC, cpuC1, cpuC2, errmax, errmed);
 
-            outFile << phi << ",DGEMM (k=" + std::to_string(k) + "),";
-            std::cout << phi << ",DGEMM (k=" + std::to_string(k) + "),";
+            outFile << phi << ",DSGEMM (k=" + std::to_string(k) + "),";
+            std::cout << phi << ",DSGEMM (k=" + std::to_string(k) + "),";
             for (int i = 0; i < num_moduli_list.size(); ++i) {
                 outFile << std::scientific << errmax << ",";
                 std::cout << std::scientific << errmax << ",";
@@ -161,7 +161,7 @@ void accuracy_check(std::string &deviceName, std::string &dateTime) {
             for (auto &num_moduli : num_moduli_list) {
                 std::vector<double> timestmp(4, 0);
                 cudaDeviceSynchronize();
-                timestmp = gemmul8::gemm<double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, true, work_gemm);
+                timestmp = gemmul8::gemm<double, float, double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, true, work_gemm);
                 cudaDeviceSynchronize();
                 cudaMemcpy(cpuC, devC, m * n * sizeof(double), cudaMemcpyDeviceToHost);
                 cudaDeviceSynchronize();
@@ -180,7 +180,7 @@ void accuracy_check(std::string &deviceName, std::string &dateTime) {
             for (auto &num_moduli : num_moduli_list) {
                 std::vector<double> timestmp(4);
                 cudaDeviceSynchronize();
-                timestmp = gemmul8::gemm<double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, false, work_gemm);
+                timestmp = gemmul8::gemm<double, float, double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, false, work_gemm);
                 cudaDeviceSynchronize();
                 cudaMemcpy(cpuC, devC, m * n * sizeof(double), cudaMemcpyDeviceToHost);
                 cudaDeviceSynchronize();
@@ -201,7 +201,7 @@ void accuracy_check(std::string &deviceName, std::string &dateTime) {
 }
 
 void time_check(std::string &deviceName, std::string &dateTime) {
-    std::string fileName = "oz2_results_d_time_" + deviceName + "_" + dateTime + ".csv";
+    std::string fileName = "oz2_results_df_time_" + deviceName + "_" + dateTime + ".csv";
     std::ofstream outFile(fileName);
     outFile << "phi,m,n,k,"
             << "function,"
@@ -243,7 +243,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
     double *work_cpu            = new double[n_max * n_max * 3];
     size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max);
     void *work_gpu;
-    cudaMalloc(&work_gpu, n_max * n_max * sizeof(double) * ((num_moduli_max >= 5) ? 3 : 4));
+    cudaMalloc(&work_gpu, n_max * n_max * sizeof(double) * ((num_moduli_max >= 5) ? 3 : 4) + n_max * n_max * sizeof(float));
     cudaDeviceSynchronize();
     void *work_gemm;
     cudaMalloc(&work_gemm, worksize);
@@ -256,8 +256,9 @@ void time_check(std::string &deviceName, std::string &dateTime) {
         double *cpuC1      = cpuC + m * n;
         double *cpuC2      = cpuC1 + m * n;
         double *devA       = reinterpret_cast<double *>(work_gpu);
-        double *devB       = devA + m * k;
-        double *devC       = devB + k * n;
+        float *devB        = reinterpret_cast<float *>(devA + m * k);
+        double *devBd      = reinterpret_cast<double *>(devB + k * n);
+        double *devC       = devBd + k * n;
         double *devC1      = devC;
         double *devC2      = (num_moduli_max >= 5) ? (reinterpret_cast<double *>(work_gemm)) : (devC1 + m * n);
         const size_t lda8i = ((k + 15) >> 4) << 4;
@@ -273,12 +274,13 @@ void time_check(std::string &deviceName, std::string &dateTime) {
         // generate matrices
         //--------------------
         makemat::randmat<double>(m, k, devA, phi, seed);
-        makemat::randmat<double>(k, n, devB, phi, seed);
+        makemat::randmat<float>(k, n, devB, phi, seed);
 
         //--------------------
         // C1+C2 := A*B (double-double arithmetic)
         //--------------------
-        eval::dd_gpu::simple_gemm(m, n, k, devA, devB, devC1, devC2);
+        makemat::f2d(k, n, devB, devBd);
+        eval::dd_gpu::simple_gemm(m, n, k, devA, devBd, devC1, devC2);
         cudaDeviceSynchronize();
         cudaMemcpy(cpuC1, devC1, m * n * sizeof(double), cudaMemcpyDeviceToHost);
         cudaMemcpy(cpuC2, devC2, m * n * sizeof(double), cudaMemcpyDeviceToHost);
@@ -316,7 +318,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
         double alpha = 1.0;
         double beta  = 0.0;
         cudaDeviceSynchronize();
-        cublasGemmEx(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, CUDA_R_64F, m, devB, CUDA_R_64F, k, &beta, devC, CUDA_R_64F, m, CUBLAS_COMPUTE_64F, CUBLAS_GEMM_DEFAULT);
+        cublasGemmEx(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, CUDA_R_64F, m, devBd, CUDA_R_64F, k, &beta, devC, CUDA_R_64F, m, CUBLAS_COMPUTE_64F, CUBLAS_GEMM_DEFAULT);
         cudaDeviceSynchronize();
         cudaMemcpy(cpuC, devC, m * n * sizeof(double), cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize();
@@ -326,24 +328,24 @@ void time_check(std::string &deviceName, std::string &dateTime) {
         for (int iter = 0; iter < itermax; ++iter) {
             cudaDeviceSynchronize();
             start = std::chrono::system_clock::now();
-            cublasGemmEx(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, CUDA_R_64F, m, devB, CUDA_R_64F, k, &beta, devC, CUDA_R_64F, m, CUBLAS_COMPUTE_64F, CUBLAS_GEMM_DEFAULT);
+            cublasGemmEx(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, CUDA_R_64F, m, devBd, CUDA_R_64F, k, &beta, devC, CUDA_R_64F, m, CUBLAS_COMPUTE_64F, CUBLAS_GEMM_DEFAULT);
             cudaDeviceSynchronize();
             stop = std::chrono::system_clock::now();
             time += std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
         }
         time = time / itermax * 1.e-9;
 
-        outFile << phi << "," << m << "," << n << "," << k << "," << "DGEMM" << ",";
+        outFile << phi << "," << m << "," << n << "," << k << "," << "DSGEMM" << ",";
         outFile << std::scientific << maxerr << "," << mederr << "," << 2.0 * m * n * k / time * 1.e-12 << "," << time << ","
                 << "," << "," << "," << "," << std::endl;
-        std::cout << phi << "," << m << "," << n << "," << k << "," << "DGEMM" << ",";
+        std::cout << phi << "," << m << "," << n << "," << k << "," << "DSGEMM" << ",";
         std::cout << std::scientific << maxerr << "," << mederr << "," << 2.0 * m * n * k / time * 1.e-12 << "," << time << ","
                   << "," << "," << "," << "," << std::endl;
 
         //--------------------
         // C := A*B by ozIMMU_EF
         //--------------------
-#ifdef ozIMMU_EF_FLAG
+/*#ifdef ozIMMU_EF_FLAG
         mtk::ozimmu::gemm_list_t fp64in_gemm;
         fp64in_gemm.push_back({mtk::ozimmu::op_n, mtk::ozimmu::op_n, m, n, k, mtk::ozimmu::real, mtk::ozimmu::fp64_int8_16});
         mtk::ozimmu::handle_t ozimmu_handle;
@@ -409,7 +411,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
             slice++;
         }
         mtk::ozimmu::destroy(ozimmu_handle);
-#endif
+#endif*/
 
         //--------------------
         // C := A*B by ozaki-scheme2
@@ -419,7 +421,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
             std::vector<double> timestmp(4, 0);
 
             cudaDeviceSynchronize();
-            timestmp = gemmul8::gemm<double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, true, work_gemm);
+            timestmp = gemmul8::gemm<double, float, double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, true, work_gemm);
             cudaDeviceSynchronize();
             cudaMemcpy(cpuC, devC, m * n * sizeof(double), cudaMemcpyDeviceToHost);
             cudaDeviceSynchronize();
@@ -429,7 +431,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
             for (int iter = 0; iter < itermax; ++iter) {
                 cudaDeviceSynchronize();
                 start    = std::chrono::system_clock::now();
-                timestmp = gemmul8::gemm<double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, true, work_gemm);
+                timestmp = gemmul8::gemm<double, float, double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, true, work_gemm);
                 cudaDeviceSynchronize();
                 stop = std::chrono::system_clock::now();
                 time += std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
@@ -454,7 +456,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
             std::vector<double> timestmp(4);
 
             cudaDeviceSynchronize();
-            timestmp = gemmul8::gemm<double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, false, work_gemm);
+            timestmp = gemmul8::gemm<double, float, double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, false, work_gemm);
             cudaDeviceSynchronize();
             cudaMemcpy(cpuC, devC, m * n * sizeof(double), cudaMemcpyDeviceToHost);
             cudaDeviceSynchronize();
@@ -464,7 +466,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
             for (int iter = 0; iter < itermax; ++iter) {
                 cudaDeviceSynchronize();
                 start    = std::chrono::system_clock::now();
-                timestmp = gemmul8::gemm<double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, false, work_gemm);
+                timestmp = gemmul8::gemm<double, float, double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, false, work_gemm);
                 cudaDeviceSynchronize();
                 stop = std::chrono::system_clock::now();
                 time += std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
@@ -490,7 +492,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
 }
 
 void watt_check(std::string &deviceName, std::string &dateTime) {
-    std::string fileName = "oz2_results_d_watt_" + deviceName + "_" + dateTime + ".csv";
+    std::string fileName = "oz2_results_df_watt_" + deviceName + "_" + dateTime + ".csv";
     std::ofstream outFile(fileName);
     outFile << "phi,m,n,k,"
             << "function,"
@@ -536,8 +538,9 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
         double *cpuC1      = cpuC + m * n;
         double *cpuC2      = cpuC1 + m * n;
         double *devA       = reinterpret_cast<double *>(work_gpu);
-        double *devB       = devA + m * k;
-        double *devC       = devB + k * n;
+        float *devB       = reinterpret_cast<float *>(devA + m * k);
+        double *devBd      = reinterpret_cast<double *>(devB + k * n);
+        double *devC       = devBd + k * n;
         double *devC1      = devC + m * n;
         double *devC2      = devC1 + m * n;
         const size_t lda8i = ((k + 15) >> 4) << 4;
@@ -551,12 +554,13 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
         // generate matrices
         //--------------------
         makemat::randmat<double>(m, k, devA, phi, seed);
-        makemat::randmat<double>(k, n, devB, phi, seed);
+        makemat::randmat<float>(k, n, devB, phi, seed);
 
         //--------------------
         // C1+C2 := A*B (double-double arithmetic)
         //--------------------
-        eval::dd_gpu::simple_gemm(m, n, k, devA, devB, devC1, devC2);
+        makemat::f2d(k, n, devB, devBd);
+        eval::dd_gpu::simple_gemm(m, n, k, devA, devBd, devC1, devC2);
         cudaDeviceSynchronize();
         cudaMemcpy(cpuC1, devC1, m * n * sizeof(double), cudaMemcpyDeviceToHost);
         cudaMemcpy(cpuC2, devC2, m * n * sizeof(double), cudaMemcpyDeviceToHost);
@@ -616,7 +620,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
                              devA,
                              CUDA_R_64F,
                              m,
-                             devB,
+                             devBd,
                              CUDA_R_64F,
                              k,
                              &beta,
@@ -634,15 +638,15 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
         cudaDeviceSynchronize();
         eval::err::gemm_err(m, n, cpuC, cpuC1, cpuC2, maxerr, mederr);
 
-        outFile << phi << "," << m << "," << n << "," << k << "," << "DGEMM" << ",";
+        outFile << phi << "," << m << "," << n << "," << k << "," << "DSGEMM" << ",";
         outFile << std::scientific << maxerr << "," << mederr << "," << res[0] << "," << res[1] * 1.e-9 << "," << std::endl;
-        std::cout << phi << "," << m << "," << n << "," << k << "," << "DGEMM" << ",";
+        std::cout << phi << "," << m << "," << n << "," << k << "," << "DSGEMM" << ",";
         std::cout << std::scientific << maxerr << "," << mederr << "," << res[0] << "," << res[1] * 1.e-9 << "," << std::endl;
 
         //--------------------
         // C := A*B by ozIMMU_EF
         //--------------------
-#ifdef ozIMMU_EF_FLAG
+/*#ifdef ozIMMU_EF_FLAG
         mtk::ozimmu::gemm_list_t fp64in_gemm;
         fp64in_gemm.push_back({mtk::ozimmu::op_n, mtk::ozimmu::op_n, m, n, k, mtk::ozimmu::real, mtk::ozimmu::fp64_int8_16});
         mtk::ozimmu::handle_t ozimmu_handle;
@@ -686,7 +690,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
             slice++;
         }
         mtk::ozimmu::destroy(ozimmu_handle);
-#endif
+#endif*/
 
         //--------------------
         // C := A*B by ozaki-scheme2
@@ -696,7 +700,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
 
             res = getWatt::getWatt(
                 [&]() {
-                    gemmul8::gemm<double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, true, work_gemm);
+                    gemmul8::gemm<double, float, double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, true, work_gemm);
                 },
                 m,
                 n,
@@ -721,7 +725,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
 
             res = getWatt::getWatt(
                 [&]() {
-                    gemmul8::gemm<double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, false, work_gemm);
+                    gemmul8::gemm<double, float, double>(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, false, work_gemm);
                 },
                 m,
                 n,
