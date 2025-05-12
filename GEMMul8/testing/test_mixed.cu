@@ -144,8 +144,8 @@ void accuracy_check(std::string &deviceName, std::string &dateTime) {
             cudaDeviceSynchronize();
             eval::err::gemm_err(m, n, cpuC, cpuC1, cpuC2, errmax, errmed);
 
-            outFile << phi << ",DSGEMM (k=" + std::to_string(k) + "),";
-            std::cout << phi << ",DSGEMM (k=" + std::to_string(k) + "),";
+            outFile << phi << ",DGEMM (k=" + std::to_string(k) + "),";
+            std::cout << phi << ",DGEMM (k=" + std::to_string(k) + "),";
             for (int i = 0; i < num_moduli_list.size(); ++i) {
                 outFile << std::scientific << errmax << ",";
                 std::cout << std::scientific << errmax << ",";
@@ -335,17 +335,17 @@ void time_check(std::string &deviceName, std::string &dateTime) {
         }
         time = time / itermax * 1.e-9;
 
-        outFile << phi << "," << m << "," << n << "," << k << "," << "DSGEMM" << ",";
+        outFile << phi << "," << m << "," << n << "," << k << "," << "DGEMM" << ",";
         outFile << std::scientific << maxerr << "," << mederr << "," << 2.0 * m * n * k / time * 1.e-12 << "," << time << ","
                 << "," << "," << "," << "," << std::endl;
-        std::cout << phi << "," << m << "," << n << "," << k << "," << "DSGEMM" << ",";
+        std::cout << phi << "," << m << "," << n << "," << k << "," << "DGEMM" << ",";
         std::cout << std::scientific << maxerr << "," << mederr << "," << 2.0 * m * n * k / time * 1.e-12 << "," << time << ","
                   << "," << "," << "," << "," << std::endl;
 
         //--------------------
         // C := A*B by ozIMMU_EF
         //--------------------
-/*#ifdef ozIMMU_EF_FLAG
+#ifdef ozIMMU_EF_FLAG
         mtk::ozimmu::gemm_list_t fp64in_gemm;
         fp64in_gemm.push_back({mtk::ozimmu::op_n, mtk::ozimmu::op_n, m, n, k, mtk::ozimmu::real, mtk::ozimmu::fp64_int8_16});
         mtk::ozimmu::handle_t ozimmu_handle;
@@ -411,7 +411,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
             slice++;
         }
         mtk::ozimmu::destroy(ozimmu_handle);
-#endif*/
+#endif
 
         //--------------------
         // C := A*B by ozaki-scheme2
@@ -638,15 +638,15 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
         cudaDeviceSynchronize();
         eval::err::gemm_err(m, n, cpuC, cpuC1, cpuC2, maxerr, mederr);
 
-        outFile << phi << "," << m << "," << n << "," << k << "," << "DSGEMM" << ",";
+        outFile << phi << "," << m << "," << n << "," << k << "," << "DGEMM" << ",";
         outFile << std::scientific << maxerr << "," << mederr << "," << res[0] << "," << res[1] * 1.e-9 << "," << std::endl;
-        std::cout << phi << "," << m << "," << n << "," << k << "," << "DSGEMM" << ",";
+        std::cout << phi << "," << m << "," << n << "," << k << "," << "DGEMM" << ",";
         std::cout << std::scientific << maxerr << "," << mederr << "," << res[0] << "," << res[1] * 1.e-9 << "," << std::endl;
 
         //--------------------
         // C := A*B by ozIMMU_EF
         //--------------------
-/*#ifdef ozIMMU_EF_FLAG
+#ifdef ozIMMU_EF_FLAG
         mtk::ozimmu::gemm_list_t fp64in_gemm;
         fp64in_gemm.push_back({mtk::ozimmu::op_n, mtk::ozimmu::op_n, m, n, k, mtk::ozimmu::real, mtk::ozimmu::fp64_int8_16});
         mtk::ozimmu::handle_t ozimmu_handle;
@@ -690,7 +690,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
             slice++;
         }
         mtk::ozimmu::destroy(ozimmu_handle);
-#endif*/
+#endif
 
         //--------------------
         // C := A*B by ozaki-scheme2

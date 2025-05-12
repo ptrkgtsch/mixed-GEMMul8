@@ -193,12 +193,13 @@ __global__ void inverse_scaling_1_ab(const T alpha,                          //
 
 // C := C64f - round(C64f1/M1 + C64f2/M1)*(M1 + M2)
 // C := diag(2^sftA) * C * diag(2^sftB)
+template <typename T>
 __global__ void inverse_scaling_2_10(const unsigned num_moduli,
                                      const size_t m,                         // size(C64f,1)
                                      const size_t sizeC,                     //
                                      const size_t incC8u,                    //
                                      const uint8_t *const __restrict__ C8u,  // input
-                                     double *const __restrict__ C,           // output
+                                     T *const __restrict__ C,                // output
                                      const size_t ldc,                       // leading dimension
                                      const double invM,                      //
                                      const double M1,                        //
@@ -227,15 +228,16 @@ __global__ void inverse_scaling_2_10(const unsigned num_moduli,
     tmpC2              = scalbn(tmpC2, sftA[row] + sftB[col]);
 
     const auto idxC = col * ldc + row;
-    C[idxC]         = tmpC2;
+    C[idxC]         = Tcast<T>(tmpC2);
 }
 
+template <typename T>
 __global__ void inverse_scaling_2_11(const unsigned num_moduli,
                                      const size_t m,                         // size(C64f,1)
                                      const size_t sizeC,                     //
                                      const size_t incC8u,                    //
                                      const uint8_t *const __restrict__ C8u,  // input
-                                     double *const __restrict__ C,           // output
+                                     T *const __restrict__ C,                // output
                                      const size_t ldc,                       // leading dimension
                                      const double invM,                      //
                                      const double M1,                        //
@@ -264,16 +266,17 @@ __global__ void inverse_scaling_2_11(const unsigned num_moduli,
     tmpC2              = scalbn(tmpC2, sftA[row] + sftB[col]);
 
     const auto idxC = col * ldc + row;
-    C[idxC] += tmpC2;
+    C[idxC] += Tcast<T>(tmpC2);
 }
 
-__global__ void inverse_scaling_2_1b(const double beta,                      //
+template <typename T>
+__global__ void inverse_scaling_2_1b(const T beta,                           //
                                      const unsigned num_moduli,              //
                                      const size_t m,                         // size(C64f,1)
                                      const size_t sizeC,                     //
                                      const size_t incC8u,                    //
                                      const uint8_t *const __restrict__ C8u,  // input
-                                     double *const __restrict__ C,           // output
+                                     T *const __restrict__ C,                // output
                                      const size_t ldc,                       // leading dimension
                                      const double invM,                      //
                                      const double M1,                        //
@@ -302,16 +305,17 @@ __global__ void inverse_scaling_2_1b(const double beta,                      //
     tmpC2              = scalbn(tmpC2, sftA[row] + sftB[col]);
 
     const auto idxC = col * ldc + row;
-    C[idxC]         = fma(beta, tmpC2, C[idxC]);
+    C[idxC]         = Tfma<T>(beta, Tcast<T>(tmpC2), C[idxC]);
 }
 
-__global__ void inverse_scaling_2_a1(const double alpha,                     //
+template <typename T>
+__global__ void inverse_scaling_2_a1(const T alpha,                          //
                                      const unsigned num_moduli,              //
                                      const size_t m,                         // size(C64f,1)
                                      const size_t sizeC,                     //
                                      const size_t incC8u,                    //
                                      const uint8_t *const __restrict__ C8u,  // input
-                                     double *const __restrict__ C,           // output
+                                     T *const __restrict__ C,                // output
                                      const size_t ldc,                       // leading dimension
                                      const double invM,                      //
                                      const double M1,                        //
@@ -340,17 +344,18 @@ __global__ void inverse_scaling_2_a1(const double alpha,                     //
     tmpC2              = scalbn(tmpC2, sftA[row] + sftB[col]);
 
     const auto idxC = col * ldc + row;
-    C[idxC]         = fma(alpha, C[idxC], tmpC2);
+    C[idxC]         = Tfma<T>(alpha, C[idxC], Tcast<T>(tmpC2));
 }
 
-__global__ void inverse_scaling_2_ab(const double alpha,                     //
-                                     const double beta,                      //
+template <typename T>
+__global__ void inverse_scaling_2_ab(const T alpha,                          //
+                                     const T beta,                           //
                                      const unsigned num_moduli,              //
                                      const size_t m,                         // size(C64f,1)
                                      const size_t sizeC,                     //
                                      const size_t incC8u,                    //
                                      const uint8_t *const __restrict__ C8u,  // input
-                                     double *const __restrict__ C,           // output
+                                     T *const __restrict__ C,                // output
                                      const size_t ldc,                       // leading dimension
                                      const double invM,                      //
                                      const double M1,                        //
@@ -379,21 +384,22 @@ __global__ void inverse_scaling_2_ab(const double alpha,                     //
     tmpC2              = scalbn(tmpC2, sftA[row] + sftB[col]);
 
     const auto idxC = col * ldc + row;
-    C[idxC]         = fma(beta, C[idxC], alpha * tmpC2);
+    C[idxC]         = Tfma<T>(beta, C[idxC], alpha * Tcast<T>(tmpC2));
 }
 
 // interface!!
+template <typename T>
 __inline__ void inverse_scaling(const unsigned num_moduli,
                                 const size_t m,            // size(C,1)
                                 const size_t n,            // size(C,2)
                                 const uint8_t *const C8u,  // input
                                 const size_t incC8u,       //
-                                float *const C,            // output
+                                T *const C,                // output
                                 const size_t ldc,          // leading dimension
                                 const int16_t *const sftA, // exponent of shift values for rows of A
                                 const int16_t *const sftB, // exponent of shift values for cols of B
-                                const float alpha,         //
-                                const float beta)          //
+                                const T alpha,             //
+                                const T beta)              //
 {
     const unsigned table_idx = num_moduli - 2;
     const size_t sizeC       = m * n;
@@ -401,33 +407,34 @@ __inline__ void inverse_scaling(const unsigned num_moduli,
     const double M           = oz2_table::M[table_idx][0];
     if (alpha == 1.0F) {
         if (beta == 0.0F) {
-            inverse_scaling_1_10<float><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
+            inverse_scaling_1_10<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
         } else if (beta == 1.0F) {
-            inverse_scaling_1_11<float><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
+            inverse_scaling_1_11<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
         } else {
-            inverse_scaling_1_1b<float><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(beta, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
+            inverse_scaling_1_1b<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(beta, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
         }
     } else {
         if (beta == 1.0F) {
-            inverse_scaling_1_a1<float><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(alpha, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
+            inverse_scaling_1_a1<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(alpha, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
         } else {
-            inverse_scaling_1_ab<float><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(alpha, beta, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
+            inverse_scaling_1_ab<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(alpha, beta, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
         }
     }
 }
 
+template <typename T>
 __inline__ void inverse_scaling(const bool is_numM_1,
                                 const unsigned num_moduli,
                                 const size_t m,            // size(C,1)
                                 const size_t n,            // size(C,2)
                                 const uint8_t *const C8u,  // input
                                 const size_t incC8u,       //
-                                double *const C,           // output
+                                T *const C,                // output
                                 const size_t ldc,          // leading dimension
                                 const int16_t *const sftA, // exponent of shift values for rows of A
                                 const int16_t *const sftB, // exponent of shift values for cols of B
-                                const double alpha,        //
-                                const double beta)         //
+                                const T alpha,             //
+                                const T beta)              //
 {
     const unsigned table_idx = num_moduli - 2;
     const size_t sizeC       = m * n;
@@ -436,17 +443,17 @@ __inline__ void inverse_scaling(const bool is_numM_1,
         const double M    = oz2_table::M[table_idx][0];
         if (alpha == 1.0) {
             if (beta == 0.0) {
-                inverse_scaling_1_10<double><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
+                inverse_scaling_1_10<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
             } else if (beta == 1.0) {
-                inverse_scaling_1_11<double><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
+                inverse_scaling_1_11<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
             } else {
-                inverse_scaling_1_1b<double><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(beta, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
+                inverse_scaling_1_1b<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(beta, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
             }
         } else {
             if (beta == 1.0) {
-                inverse_scaling_1_a1<double><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(alpha, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
+                inverse_scaling_1_a1<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(alpha, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
             } else {
-                inverse_scaling_1_ab<double><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(alpha, beta, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
+                inverse_scaling_1_ab<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(alpha, beta, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M, sftA, sftB);
             }
         }
     } else {
@@ -455,17 +462,17 @@ __inline__ void inverse_scaling(const bool is_numM_1,
         const double M2   = oz2_table::M[table_idx][1];
         if (alpha == 1.0) {
             if (beta == 0.0) {
-                inverse_scaling_2_10<<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M1, M2, sftA, sftB);
+                inverse_scaling_2_10<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M1, M2, sftA, sftB);
             } else if (beta == 1) {
-                inverse_scaling_2_11<<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M1, M2, sftA, sftB);
+                inverse_scaling_2_11<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M1, M2, sftA, sftB);
             } else {
-                inverse_scaling_2_1b<<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(beta, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M1, M2, sftA, sftB);
+                inverse_scaling_2_1b<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(beta, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M1, M2, sftA, sftB);
             }
         } else {
             if (beta == 1.0) {
-                inverse_scaling_2_a1<<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(alpha, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M1, M2, sftA, sftB);
+                inverse_scaling_2_a1<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(alpha, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M1, M2, sftA, sftB);
             } else {
-                inverse_scaling_2_ab<<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(alpha, beta, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M1, M2, sftA, sftB);
+                inverse_scaling_2_ab<T><<<oz2_const::grids_invscaling, oz2_const::threads_invscaling>>>(alpha, beta, num_moduli, m, sizeC, incC8u, C8u, C, ldc, invM, M1, M2, sftA, sftB);
             }
         }
     }

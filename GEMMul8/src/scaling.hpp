@@ -152,7 +152,7 @@ __device__ T find_amax_and_nrm(const T *const ptr,    //
     return shm[0];
 }
 
-template <typename T, typename TPrec = T> __device__ int8_t mod_8i(T a, unsigned j);
+template <typename T> __device__ int8_t mod_8i(T a, unsigned j);
 template <> __device__ int8_t mod_8i<double>(double a, unsigned j) {
     const auto val = oz2_table::moduli_dev[j];
     float tmp      = __double2float_rn(fma(rint(a * val.y), val.x, a));
@@ -165,13 +165,6 @@ template <> __device__ int8_t mod_8i<float>(float a, unsigned j) {
     float tmp      = __fmaf_rn(rintf(a * val.y), val.x, a);
     tmp            = __fmaf_rn(rintf(tmp * val.y), val.x, tmp);
     tmp            = __fmaf_rn(rintf(tmp * val.y), val.x, tmp);
-    return static_cast<int8_t>(tmp);
-}
-template <> __device__ int8_t mod_8i<float, double>(float a, unsigned j) {
-    const auto val = oz2_table::moduli_dev[j];
-    float tmp      = __fmaf_rn(rint(a * val.y), val.x, a);
-    tmp            = __fmaf_rn(rintf(tmp * val.w), val.z, tmp);
-    tmp            = __fmaf_rn(rintf(tmp * val.w), val.z, tmp);
     return static_cast<int8_t>(tmp);
 }
 
@@ -277,7 +270,7 @@ __global__ void extract_B8i_kernel(const size_t k,                   // size(B,1
     }
 }
 
-template <typename T, typename TPrec = T>
+template <typename T>
 __global__ void scalingA_kernel(const size_t n,                         // size(C,2)
                                 const size_t k,                         // size(A,2)
                                 const size_t incA8i,                    // lda8i * m
@@ -314,10 +307,10 @@ __global__ void scalingA_kernel(const size_t n,                         // size(
         char4 out4;
         for (unsigned j = 0; j < num_moduli; ++j) {
 
-            out4.x = mod_8i<T, TPrec>(in4.x, j);
-            out4.y = mod_8i<T, TPrec>(in4.y, j);
-            out4.z = mod_8i<T, TPrec>(in4.z, j);
-            out4.w = mod_8i<T, TPrec>(in4.w, j);
+            out4.x = mod_8i<T>(in4.x, j);
+            out4.y = mod_8i<T>(in4.y, j);
+            out4.z = mod_8i<T>(in4.z, j);
+            out4.w = mod_8i<T>(in4.w, j);
 
             *reinterpret_cast<char4 *>(out + j * incA8i + idx) = out4;
         }
@@ -335,10 +328,10 @@ __global__ void scalingA_kernel(const size_t n,                         // size(
         char4 out4;
         for (unsigned j = 0; j < num_moduli; ++j) {
 
-            out4.x = (idx < k) ? mod_8i<T, TPrec>(in4.x, j) : 0;
-            out4.y = (idx + 1 < k) ? mod_8i<T, TPrec>(in4.y, j) : 0;
-            out4.z = (idx + 2 < k) ? mod_8i<T, TPrec>(in4.z, j) : 0;
-            out4.w = (idx + 3 < k) ? mod_8i<T, TPrec>(in4.w, j) : 0;
+            out4.x = (idx < k) ? mod_8i<T>(in4.x, j) : 0;
+            out4.y = (idx + 1 < k) ? mod_8i<T>(in4.y, j) : 0;
+            out4.z = (idx + 2 < k) ? mod_8i<T>(in4.z, j) : 0;
+            out4.w = (idx + 3 < k) ? mod_8i<T>(in4.w, j) : 0;
 
             *reinterpret_cast<char4 *>(out + j * incA8i + idx) = out4;
         }
@@ -349,7 +342,7 @@ __global__ void scalingA_kernel(const size_t n,                         // size(
     }
 }
 
-template <typename T, typename TPrec = T>
+template <typename T>
 __global__ void scalingB_kernel(const size_t m,                         // size(C,1)
                                 const size_t k,                         // size(B,1)
                                 const size_t incB8i,                    // ldb8i * n
@@ -386,10 +379,10 @@ __global__ void scalingB_kernel(const size_t m,                         // size(
         char4 out4;
         for (unsigned j = 0; j < num_moduli; ++j) {
 
-            out4.x = mod_8i<T, TPrec>(in4.x, j);
-            out4.y = mod_8i<T, TPrec>(in4.y, j);
-            out4.z = mod_8i<T, TPrec>(in4.z, j);
-            out4.w = mod_8i<T, TPrec>(in4.w, j);
+            out4.x = mod_8i<T>(in4.x, j);
+            out4.y = mod_8i<T>(in4.y, j);
+            out4.z = mod_8i<T>(in4.z, j);
+            out4.w = mod_8i<T>(in4.w, j);
 
             *reinterpret_cast<char4 *>(out + j * incB8i + idx) = out4;
         }
@@ -407,10 +400,10 @@ __global__ void scalingB_kernel(const size_t m,                         // size(
         char4 out4;
         for (unsigned j = 0; j < num_moduli; ++j) {
 
-            out4.x = (idx < k) ? mod_8i<T, TPrec>(in4.x, j) : 0;
-            out4.y = (idx + 1 < k) ? mod_8i<T, TPrec>(in4.y, j) : 0;
-            out4.z = (idx + 2 < k) ? mod_8i<T, TPrec>(in4.z, j) : 0;
-            out4.w = (idx + 3 < k) ? mod_8i<T, TPrec>(in4.w, j) : 0;
+            out4.x = (idx < k) ? mod_8i<T>(in4.x, j) : 0;
+            out4.y = (idx + 1 < k) ? mod_8i<T>(in4.y, j) : 0;
+            out4.z = (idx + 2 < k) ? mod_8i<T>(in4.z, j) : 0;
+            out4.w = (idx + 3 < k) ? mod_8i<T>(in4.w, j) : 0;
 
             *reinterpret_cast<char4 *>(out + j * incB8i + idx) = out4;
         }
@@ -421,7 +414,7 @@ __global__ void scalingB_kernel(const size_t m,                         // size(
     }
 }
 
-template <typename T1, typename T2 = T1> // will only run if types are different because of below specialization
+/*template <typename T1, typename T2 = T1> // will only run if types are different because of below specialization
 std::enable_if_t<
     std::is_same_v<T1, double> || std::is_same_v<T2, double>,
     void
@@ -477,9 +470,9 @@ __inline__ scaling(cublasHandle_t handle,        // handle
     } else {
         scalingA_kernel<T2, double><<<n, oz2_const::threads_scaling>>>(n, k, ldb8i * n, num_moduli, B, ldb, C32i, m, B8i, ldb8i, sftB, log2M);
     }
-}
+}*/
 
-template <typename T>
+template <typename TA, typename TB>
 __inline__ void scaling(cublasHandle_t handle,        // handle
                         const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
                         const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
@@ -487,9 +480,9 @@ __inline__ void scaling(cublasHandle_t handle,        // handle
                         const size_t n,               // size(B,2) & size(C,2)
                         const size_t k,               // size(A,2) & size(B,1)
                         const unsigned num_moduli,    // #moduli
-                        const T *const A,             // input
+                        const TA *const A,             // input
                         const size_t lda,             // leading dimension
-                        const T *const B,             // input
+                        const TB *const B,             // input
                         const size_t ldb,             // leading dimension
                         int8_t *const A8i,            // output (k * m)
                         const size_t lda8i,           // leading dimension
@@ -502,14 +495,14 @@ __inline__ void scaling(cublasHandle_t handle,        // handle
 {
     // extract first 7-bit from A and B
     if (op_A == CUBLAS_OP_N) {
-        extract_A8i_kernel<T><<<m, oz2_const::threads_scaling>>>(k, A, lda, A8i, lda8i, sftA);
+        extract_A8i_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, A, lda, A8i, lda8i, sftA);
     } else {
-        extract_B8i_kernel<T><<<m, oz2_const::threads_scaling>>>(k, A, lda, A8i, lda8i, sftA);
+        extract_B8i_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, A, lda, A8i, lda8i, sftA);
     }
     if (op_B == CUBLAS_OP_N) {
-        extract_B8i_kernel<T><<<n, oz2_const::threads_scaling>>>(k, B, ldb, B8i, ldb8i, sftB);
+        extract_B8i_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, B, ldb, B8i, ldb8i, sftB);
     } else {
-        extract_A8i_kernel<T><<<n, oz2_const::threads_scaling>>>(k, B, ldb, B8i, ldb8i, sftB);
+        extract_A8i_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, B, ldb, B8i, ldb8i, sftB);
     }
 
     // C32i := A8i^T*B8i
@@ -522,14 +515,14 @@ __inline__ void scaling(cublasHandle_t handle,        // handle
     cudaDeviceSynchronize();
     const float log2M = oz2_table::int8tc::log2M[table_idx]; // fld(log2(M-1)/2 - 0.5)
     if (op_A == CUBLAS_OP_N) {
-        scalingA_kernel<T><<<m, oz2_const::threads_scaling>>>(n, k, lda8i * m, num_moduli, A, lda, C32i, m, A8i, lda8i, sftA, log2M);
+        scalingA_kernel<TA><<<m, oz2_const::threads_scaling>>>(n, k, lda8i * m, num_moduli, A, lda, C32i, m, A8i, lda8i, sftA, log2M);
     } else {
-        scalingB_kernel<T><<<m, oz2_const::threads_scaling>>>(m, k, lda8i * m, num_moduli, A, lda, C32i, m, A8i, lda8i, sftA, log2M);
+        scalingB_kernel<TA><<<m, oz2_const::threads_scaling>>>(m, k, lda8i * m, num_moduli, A, lda, C32i, m, A8i, lda8i, sftA, log2M);
     }
     if (op_B == CUBLAS_OP_N) {
-        scalingB_kernel<T><<<n, oz2_const::threads_scaling>>>(m, k, ldb8i * n, num_moduli, B, ldb, C32i, m, B8i, ldb8i, sftB, log2M);
+        scalingB_kernel<TB><<<n, oz2_const::threads_scaling>>>(m, k, ldb8i * n, num_moduli, B, ldb, C32i, m, B8i, ldb8i, sftB, log2M);
     } else {
-        scalingA_kernel<T><<<n, oz2_const::threads_scaling>>>(n, k, ldb8i * n, num_moduli, B, ldb, C32i, m, B8i, ldb8i, sftB, log2M);
+        scalingA_kernel<TB><<<n, oz2_const::threads_scaling>>>(n, k, ldb8i * n, num_moduli, B, ldb, C32i, m, B8i, ldb8i, sftB, log2M);
     }
 }
 
@@ -548,7 +541,7 @@ template <> __forceinline__ __device__ int compute_sft<float>(float amax, float 
     return __float2int_rd(__fmaf_rd(-0.51F, __log2f(vecnrm), log2M)) - ilogbf(amax);
 }
 
-template <typename T, typename  TPrec = T>
+template <typename T>
 __global__ void scalingA_kernel(const size_t k,                   // size(A,2)
                                 const size_t incA8i,              // lda8i * m
                                 const unsigned num_moduli,        // #moduli
@@ -585,10 +578,10 @@ __global__ void scalingA_kernel(const size_t k,                   // size(A,2)
         char4 out4;
         for (unsigned j = 0; j < num_moduli; ++j) {
 
-            out4.x = mod_8i<T, TPrec>(in4.x, j);
-            out4.y = mod_8i<T, TPrec>(in4.y, j);
-            out4.z = mod_8i<T, TPrec>(in4.z, j);
-            out4.w = mod_8i<T, TPrec>(in4.w, j);
+            out4.x = mod_8i<T>(in4.x, j);
+            out4.y = mod_8i<T>(in4.y, j);
+            out4.z = mod_8i<T>(in4.z, j);
+            out4.w = mod_8i<T>(in4.w, j);
 
             *reinterpret_cast<char4 *>(out + j * incA8i + idx) = out4;
         }
@@ -606,17 +599,17 @@ __global__ void scalingA_kernel(const size_t k,                   // size(A,2)
         char4 out4;
         for (unsigned j = 0; j < num_moduli; ++j) {
 
-            out4.x = (idx < k) ? mod_8i<T, TPrec>(in4.x, j) : 0;
-            out4.y = (idx + 1 < k) ? mod_8i<T, TPrec>(in4.y, j) : 0;
-            out4.z = (idx + 2 < k) ? mod_8i<T, TPrec>(in4.z, j) : 0;
-            out4.w = (idx + 3 < k) ? mod_8i<T, TPrec>(in4.w, j) : 0;
+            out4.x = (idx < k) ? mod_8i<T>(in4.x, j) : 0;
+            out4.y = (idx + 1 < k) ? mod_8i<T>(in4.y, j) : 0;
+            out4.z = (idx + 2 < k) ? mod_8i<T>(in4.z, j) : 0;
+            out4.w = (idx + 3 < k) ? mod_8i<T>(in4.w, j) : 0;
 
             *reinterpret_cast<char4 *>(out + j * incA8i + idx) = out4;
         }
     }
 }
 
-template <typename T, typename TPrec = T>
+template <typename T>
 __global__ void scalingB_kernel(const size_t k,                   // size(B,1)
                                 const size_t incB8i,              // ldb8i * n
                                 const unsigned num_moduli,        // #moduli
@@ -653,10 +646,10 @@ __global__ void scalingB_kernel(const size_t k,                   // size(B,1)
         char4 out4;
         for (unsigned j = 0; j < num_moduli; ++j) {
 
-            out4.x = mod_8i<T, TPrec>(in4.x, j);
-            out4.y = mod_8i<T, TPrec>(in4.y, j);
-            out4.z = mod_8i<T, TPrec>(in4.z, j);
-            out4.w = mod_8i<T, TPrec>(in4.w, j);
+            out4.x = mod_8i<T>(in4.x, j);
+            out4.y = mod_8i<T>(in4.y, j);
+            out4.z = mod_8i<T>(in4.z, j);
+            out4.w = mod_8i<T>(in4.w, j);
 
             *reinterpret_cast<char4 *>(out + j * incB8i + idx) = out4;
         }
@@ -674,17 +667,17 @@ __global__ void scalingB_kernel(const size_t k,                   // size(B,1)
         char4 out4;
         for (unsigned j = 0; j < num_moduli; ++j) {
 
-            out4.x = (idx < k) ? mod_8i<T, TPrec>(in4.x, j) : 0;
-            out4.y = (idx + 1 < k) ? mod_8i<T, TPrec>(in4.y, j) : 0;
-            out4.z = (idx + 2 < k) ? mod_8i<T, TPrec>(in4.z, j) : 0;
-            out4.w = (idx + 3 < k) ? mod_8i<T, TPrec>(in4.w, j) : 0;
+            out4.x = (idx < k) ? mod_8i<T>(in4.x, j) : 0;
+            out4.y = (idx + 1 < k) ? mod_8i<T>(in4.y, j) : 0;
+            out4.z = (idx + 2 < k) ? mod_8i<T>(in4.z, j) : 0;
+            out4.w = (idx + 3 < k) ? mod_8i<T>(in4.w, j) : 0;
 
             *reinterpret_cast<char4 *>(out + j * incB8i + idx) = out4;
         }
     }
 }
 
-template <typename T1, typename T2 = T1> // will only run if types are different because of below specialization
+/*template <typename T1, typename T2 = T1> // will only run if types are different because of below specialization
 std::enable_if_t<
     std::is_same_v<T1, double> || std::is_same_v<T2, double>,
     void
@@ -718,18 +711,18 @@ __inline__ scaling(const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
     } else {
         scalingA_kernel<T2, double><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     }
-}
+}*/
 
-template <typename T>
+template <typename TA, typename TB>
 __inline__ void scaling(const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
                         const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
                         const size_t m,               // size(A,1) & size(C,1)
                         const size_t n,               // size(B,2) & size(C,2)
                         const size_t k,               // size(A,2) & size(B,1)
                         const unsigned num_moduli,    // #moduli
-                        const T *const A,             // input
+                        const TA *const A,            // input
                         const size_t lda,             // leading dimension
-                        const T *const B,             // input
+                        const TB *const B,            // input
                         const size_t ldb,             // leading dimension
                         int8_t *const A8i,            // output (k * m)
                         const size_t lda8i,           // leading dimension
@@ -741,14 +734,14 @@ __inline__ void scaling(const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_O
 {
     const float log2M = (k < 64) ? (oz2_table::vecnorm::log2M[table_idx] - 3) : oz2_table::vecnorm::log2M[table_idx]; // fld(log2(M-1)/2 - 1.5)
     if (op_A == CUBLAS_OP_N) {
-        scalingA_kernel<T><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
+        scalingA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     } else {
-        scalingB_kernel<T><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
+        scalingB_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
     if (op_B == CUBLAS_OP_N) {
-        scalingB_kernel<T><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
+        scalingB_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     } else {
-        scalingA_kernel<T><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
+        scalingA_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     }
 }
 

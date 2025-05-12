@@ -20,20 +20,20 @@ size_t workSize(const size_t m,             // size(A,1) & size(C,1)
 //  std::vector<double> times = gemmul8::gemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, fastmode, work);
 //  or
 //  gemmul8::gemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, fastmode, work);
-template <typename T1, typename T2 = T1, typename T3 = T1>
+template <typename TA, typename TB = TA, typename TC = TA>
 std::vector<double> gemm(cublasHandle_t handle,        // handle
                          const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
                          const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
                          const size_t m,               // size(A,1) & size(C,1)
                          const size_t n,               // size(B,2) & size(C,2)
                          const size_t k,               // size(A,2) & size(B,1) <= 2^17
-                         const T1 *alpha,               //
-                         const T1 *const A,             // input
+                         const TC *alpha,              //
+                         const TA *const A,            // input
                          const size_t lda,             // leading dimension
-                         const T2 *const B,             // input
+                         const TB *const B,            // input
                          const size_t ldb,             // leading dimension
-                         const T1 *beta,                //
-                         T3 *const C,                   // output A*B
+                         const TC *beta,               //
+                         TC *const C,                  // output A*B
                          const size_t ldc,             // leading dimension
                          const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,          // false (accurate-mode) or true (fast-mode)
@@ -76,24 +76,5 @@ std::vector<double> gemm<float>(cublasHandle_t handle,        // handle
                                 const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 19
                                 const bool fastmode,          // false (accurate-mode) or true (fast-mode)
                                 void *const work);            // workspace allocated in advance
-
-template <>
-std::vector<double> gemm<double, float, double>(cublasHandle_t handle,        // handle
-                               const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                               const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
-                               const size_t m,               // size(A,1) & size(C,1)
-                               const size_t n,               // size(B,2) & size(C,2)
-                               const size_t k,               // size(A,2) & size(B,1) <= 2^17
-                               const double *alpha,          //
-                               const double *const A,        // input
-                               const size_t lda,             // leading dimension
-                               const float *const B,         // input
-                               const size_t ldb,             // leading dimension
-                               const double *beta,           //
-                               double *const C,              // output A*B
-                               const size_t ldc,             // leading dimension
-                               const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 19
-                               const bool fastmode,          // false (accurate-mode) or true (fast-mode)
-                               void *const work);            // workspace allocated in advance
 
 } // namespace gemmul8

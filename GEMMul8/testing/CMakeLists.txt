@@ -14,8 +14,8 @@ set(CMAKE_CUDA_ARCHITECTURES 80)
 
 # Directories
 set(INCDIR ../include)
-set(OZIMMU_DIR "${PROJECT_SOURCE_DIR}/../../ozIMMU_EF")
-set(CUMP_DIR "${PROJECT_SOURCE_DIR}/../../cuMpSGEMM")
+set(OZIMMU_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../ozIMMU_EF")
+set(CUMP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../cuMpSGEMM")
 
 # Options for ozIMMU_EF and cuMpSGEMM
 option(USE_OZIMMU_EF "Use ozIMMU_EF" ON)
