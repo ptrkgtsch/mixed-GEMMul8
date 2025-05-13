@@ -165,6 +165,7 @@ template <> __device__ int8_t mod_8i<float>(float a, unsigned j) {
     float tmp      = __fmaf_rn(rintf(a * val.y), val.x, a);
     tmp            = __fmaf_rn(rintf(tmp * val.y), val.x, tmp);
     tmp            = __fmaf_rn(rintf(tmp * val.y), val.x, tmp);
+    tmp            = __fmaf_rn(rintf(tmp * val.y), val.x, tmp);
     return static_cast<int8_t>(tmp);
 }
 
