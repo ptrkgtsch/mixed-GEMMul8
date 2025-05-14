@@ -61,7 +61,8 @@ endif()
 set(TEST_SOURCES
     test_double.cu
     test_float.cu
-    test_mixed.cu
+    test_mixed_double.cu
+    test_mixed_float.cu
 )
 
 foreach(TEST_SOURCE ${TEST_SOURCES})

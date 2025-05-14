@@ -296,7 +296,7 @@ std::vector<double> gemm<float>(cublasHandle_t handle,        // handle
 }
 
 template <typename TA, typename TB, typename TC>
-std::vector<double> gemm_mixed(cublasHandle_t handle,                // handle
+std::vector<double> gemm_mixed(cublasHandle_t handle,          // handle
                                  const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
                                  const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
                                  const size_t m,               // size(A,1) & size(C,1) <= 2^17
@@ -425,91 +425,91 @@ std::vector<double> gemm_mixed(cublasHandle_t handle,                // handle
 }
 
 template <>
-std::vector<double> gemm<double, float, double>(cublasHandle_t handle,                // handle
-                                 const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const size_t m,               // size(A,1) & size(C,1) <= 2^17
-                                 const size_t n,               // size(B,2) & size(C,2) <= 2^17
-                                 const size_t k,               // size(A,2) & size(B,1) <= 2^17
-                                 const double *alpha,              //
-                                 const double *const A,            // input
-                                 const size_t lda,             // leading dimension
-                                 const float *const B,            // input
-                                 const size_t ldb,             // leading dimension
-                                 const double *beta,               //
-                                 double *const C,                  // output A*B
-                                 const size_t ldc,             // leading dimension
-                                 const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 20
-                                 const bool fastmode,          // false (int8-tc) or true (vecnorm)
-                                 void *const work)             // workspace
+std::vector<double> gemm<double, float, double>(cublasHandle_t handle, // handle
+                                 const cublasOperation_t op_A,         // CUBLAS_OP_N or CUBLAS_OP_T
+                                 const cublasOperation_t op_B,         // CUBLAS_OP_N or CUBLAS_OP_T
+                                 const size_t m,                       // size(A,1) & size(C,1) <= 2^17
+                                 const size_t n,                       // size(B,2) & size(C,2) <= 2^17
+                                 const size_t k,                       // size(A,2) & size(B,1) <= 2^17
+                                 const double *alpha,                  //
+                                 const double *const A,                // input
+                                 const size_t lda,                     // leading dimension
+                                 const float *const B,                 // input
+                                 const size_t ldb,                     // leading dimension
+                                 const double *beta,                   //
+                                 double *const C,                      // output A*B
+                                 const size_t ldc,                     // leading dimension
+                                 const unsigned num_moduli,            // #moduli, 2 <= num_moduli <= 20
+                                 const bool fastmode,                  // false (int8-tc) or true (vecnorm)
+                                 void *const work)                     // workspace
 {
-    return gemm_mixed(handle, op_A, op_B, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc, num_moduli, fastmode, work);
+    return gemm_mixed<double, float, double>(handle, op_A, op_B, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc, num_moduli, fastmode, work);
 }
 
 template <>
-std::vector<double> gemm<float, double, double>(cublasHandle_t handle,                // handle
-                                 const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const size_t m,               // size(A,1) & size(C,1) <= 2^17
-                                 const size_t n,               // size(B,2) & size(C,2) <= 2^17
-                                 const size_t k,               // size(A,2) & size(B,1) <= 2^17
-                                 const double *alpha,              //
-                                 const float *const A,            // input
-                                 const size_t lda,             // leading dimension
-                                 const double *const B,            // input
-                                 const size_t ldb,             // leading dimension
-                                 const double *beta,               //
-                                 double *const C,                  // output A*B
-                                 const size_t ldc,             // leading dimension
-                                 const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 20
-                                 const bool fastmode,          // false (int8-tc) or true (vecnorm)
-                                 void *const work)             // workspace
+std::vector<double> gemm<float, double, double>(cublasHandle_t handle, // handle
+                                 const cublasOperation_t op_A,         // CUBLAS_OP_N or CUBLAS_OP_T
+                                 const cublasOperation_t op_B,         // CUBLAS_OP_N or CUBLAS_OP_T
+                                 const size_t m,                       // size(A,1) & size(C,1) <= 2^17
+                                 const size_t n,                       // size(B,2) & size(C,2) <= 2^17
+                                 const size_t k,                       // size(A,2) & size(B,1) <= 2^17
+                                 const double *alpha,                  //
+                                 const float *const A,                 // input
+                                 const size_t lda,                     // leading dimension
+                                 const double *const B,                // input
+                                 const size_t ldb,                     // leading dimension
+                                 const double *beta,                   //
+                                 double *const C,                      // output A*B
+                                 const size_t ldc,                     // leading dimension
+                                 const unsigned num_moduli,            // #moduli, 2 <= num_moduli <= 20
+                                 const bool fastmode,                  // false (int8-tc) or true (vecnorm)
+                                 void *const work)                     // workspace
 {
-    return gemm_mixed(handle, op_A, op_B, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc, num_moduli, fastmode, work);
+    return gemm_mixed<float, double, double>(handle, op_A, op_B, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc, num_moduli, fastmode, work);
 }
 
 template <>
-std::vector<double> gemm<double, float, float>(cublasHandle_t handle,                // handle
-                                 const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const size_t m,               // size(A,1) & size(C,1) <= 2^17
-                                 const size_t n,               // size(B,2) & size(C,2) <= 2^17
-                                 const size_t k,               // size(A,2) & size(B,1) <= 2^17
-                                 const float *alpha,              //
-                                 const double *const A,            // input
-                                 const size_t lda,             // leading dimension
-                                 const float *const B,            // input
-                                 const size_t ldb,             // leading dimension
-                                 const float *beta,               //
-                                 float *const C,                  // output A*B
-                                 const size_t ldc,             // leading dimension
-                                 const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 20
-                                 const bool fastmode,          // false (int8-tc) or true (vecnorm)
-                                 void *const work)             // workspace
+std::vector<double> gemm<double, float, float>(cublasHandle_t handle, // handle
+                                 const cublasOperation_t op_A,        // CUBLAS_OP_N or CUBLAS_OP_T
+                                 const cublasOperation_t op_B,        // CUBLAS_OP_N or CUBLAS_OP_T
+                                 const size_t m,                      // size(A,1) & size(C,1) <= 2^17
+                                 const size_t n,                      // size(B,2) & size(C,2) <= 2^17
+                                 const size_t k,                      // size(A,2) & size(B,1) <= 2^17
+                                 const float *alpha,                  //
+                                 const double *const A,               // input
+                                 const size_t lda,                    // leading dimension
+                                 const float *const B,                // input
+                                 const size_t ldb,                    // leading dimension
+                                 const float *beta,                   //
+                                 float *const C,                      // output A*B
+                                 const size_t ldc,                    // leading dimension
+                                 const unsigned num_moduli,           // #moduli, 2 <= num_moduli <= 20
+                                 const bool fastmode,                 // false (int8-tc) or true (vecnorm)
+                                 void *const work)                    // workspace
 {
-    return gemm_mixed(handle, op_A, op_B, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc, num_moduli, fastmode, work);
+    return gemm_mixed<double, float, float>(handle, op_A, op_B, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc, num_moduli, fastmode, work);
 }
 
 template <>
-std::vector<double> gemm<float, double, float>(cublasHandle_t handle,                // handle
-                                 const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const size_t m,               // size(A,1) & size(C,1) <= 2^17
-                                 const size_t n,               // size(B,2) & size(C,2) <= 2^17
-                                 const size_t k,               // size(A,2) & size(B,1) <= 2^17
-                                 const float *alpha,              //
-                                 const float *const A,            // input
-                                 const size_t lda,             // leading dimension
-                                 const double *const B,            // input
-                                 const size_t ldb,             // leading dimension
-                                 const float *beta,               //
-                                 float *const C,                  // output A*B
-                                 const size_t ldc,             // leading dimension
-                                 const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 20
-                                 const bool fastmode,          // false (int8-tc) or true (vecnorm)
-                                 void *const work)             // workspace
+std::vector<double> gemm<float, double, float>(cublasHandle_t handle, // handle
+                                 const cublasOperation_t op_A,        // CUBLAS_OP_N or CUBLAS_OP_T
+                                 const cublasOperation_t op_B,        // CUBLAS_OP_N or CUBLAS_OP_T
+                                 const size_t m,                      // size(A,1) & size(C,1) <= 2^17
+                                 const size_t n,                      // size(B,2) & size(C,2) <= 2^17
+                                 const size_t k,                      // size(A,2) & size(B,1) <= 2^17
+                                 const float *alpha,                  //
+                                 const float *const A,                // input
+                                 const size_t lda,                    // leading dimension
+                                 const double *const B,               // input
+                                 const size_t ldb,                    // leading dimension
+                                 const float *beta,                   //
+                                 float *const C,                      // output A*B
+                                 const size_t ldc,                    // leading dimension
+                                 const unsigned num_moduli,           // #moduli, 2 <= num_moduli <= 20
+                                 const bool fastmode,                 // false (int8-tc) or true (vecnorm)
+                                 void *const work)                    // workspace
 {
-    return gemm_mixed(handle, op_A, op_B, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc, num_moduli, fastmode, work);
+    return gemm_mixed<float, double, float>(handle, op_A, op_B, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc, num_moduli, fastmode, work);
 }
 
 } // namespace gemmul8

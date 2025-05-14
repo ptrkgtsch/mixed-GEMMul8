@@ -64,4 +64,21 @@ void f2d(size_t m,              // rows of A
     cudaDeviceSynchronize();
 }
 
+__global__ void d2f_kernel(size_t sizeA, const double *const __restrict__ in, float *const __restrict__ out) {
+    const auto idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (idx >= sizeA) return;
+    out[idx] = static_cast<double>(in[idx]);
+}
+
+void d2f(size_t m,               // rows of A
+         size_t n,               // columns of A
+         const double *const in, // input
+         float *const out)       // output
+{
+    constexpr size_t block_size = 256;
+    const size_t grid_size      = (m * n + block_size - 1) / block_size;
+    d2f_kernel<<<grid_size, block_size>>>(m * n, in, out);
+    cudaDeviceSynchronize();
+}
+
 } // namespace makemat
