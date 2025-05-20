@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <cublas_v2.h>
 #include <omp.h>
 #include <vector>
 

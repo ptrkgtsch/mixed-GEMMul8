@@ -1,8 +1,6 @@
 #pragma once
-#include <cublas_v2.h>
-#include <cuda_runtime.h>
-#include <curand_kernel.h>
 #include <vector>
+#include "../src/gpu_arch.hpp"
 
 namespace gemmul8 {
 
@@ -17,13 +15,13 @@ size_t workSize(const size_t m,             // size(A,1) & size(C,1)
 
 // gemm returns computation time in second of each part
 // Usage:
-//  std::vector<double> times = gemmul8::gemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, fastmode, work);
+//  std::vector<double> times = gemmul8::gemm(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, fastmode, work);
 //  or
-//  gemmul8::gemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, fastmode, work);
+//  gemmul8::gemm(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, fastmode, work);
 template <typename TA, typename TB = TA, typename TC = TA>
-std::vector<double> gemm(cublasHandle_t handle,        // handle
-                         const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                         const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm(gpublasHandle_t handle,        // handle
+                         const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                          const size_t m,               // size(A,1) & size(C,1)
                          const size_t n,               // size(B,2) & size(C,2)
                          const size_t k,               // size(A,2) & size(B,1) <= 2^17
@@ -40,9 +38,9 @@ std::vector<double> gemm(cublasHandle_t handle,        // handle
                          void *const work);            // workspace allocated in advance
 
 template <>
-std::vector<double> gemm<double>(cublasHandle_t handle,        // handle
-                                 const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
+                                 const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                                 const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                                  const size_t m,               // size(A,1) & size(C,1)
                                  const size_t n,               // size(B,2) & size(C,2)
                                  const size_t k,               // size(A,2) & size(B,1) <= 2^17
@@ -59,9 +57,9 @@ std::vector<double> gemm<double>(cublasHandle_t handle,        // handle
                                  void *const work);            // workspace allocated in advance
 
 template <>
-std::vector<double> gemm<float>(cublasHandle_t handle,        // handle
-                                const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                                const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
+                                const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                                const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                                 const size_t m,               // size(A,1) & size(C,1)
                                 const size_t n,               // size(B,2) & size(C,2)
                                 const size_t k,               // size(A,2) & size(B,1) <= 2^17
@@ -78,9 +76,9 @@ std::vector<double> gemm<float>(cublasHandle_t handle,        // handle
                                 void *const work);            // workspace allocated in advance
 
 template <>
-std::vector<double> gemm<double, float, double>(cublasHandle_t handle,        // handle
-                         const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                         const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm<double, float, double>(gpublasHandle_t handle,        // handle
+                         const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                          const size_t m,               // size(A,1) & size(C,1)
                          const size_t n,               // size(B,2) & size(C,2)
                          const size_t k,               // size(A,2) & size(B,1) <= 2^17
@@ -97,9 +95,9 @@ std::vector<double> gemm<double, float, double>(cublasHandle_t handle,        //
                          void *const work);            // workspace allocated in advance
 
 template <>
-std::vector<double> gemm<float, double, double>(cublasHandle_t handle,        // handle
-                         const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                         const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm<float, double, double>(gpublasHandle_t handle,        // handle
+                         const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                          const size_t m,               // size(A,1) & size(C,1)
                          const size_t n,               // size(B,2) & size(C,2)
                          const size_t k,               // size(A,2) & size(B,1) <= 2^17
@@ -116,9 +114,9 @@ std::vector<double> gemm<float, double, double>(cublasHandle_t handle,        //
                          void *const work);            // workspace allocated in advance
 
 template <>
-std::vector<double> gemm<double, float, float>(cublasHandle_t handle,        // handle
-                         const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                         const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm<double, float, float>(gpublasHandle_t handle,        // handle
+                         const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                          const size_t m,               // size(A,1) & size(C,1)
                          const size_t n,               // size(B,2) & size(C,2)
                          const size_t k,               // size(A,2) & size(B,1) <= 2^17
@@ -135,9 +133,9 @@ std::vector<double> gemm<double, float, float>(cublasHandle_t handle,        // 
                          void *const work);            // workspace allocated in
 
 template <>
-std::vector<double> gemm<float, double, float>(cublasHandle_t handle,        // handle
-                         const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                         const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm<float, double, float>(gpublasHandle_t handle,        // handle
+                         const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                          const size_t m,               // size(A,1) & size(C,1)
                          const size_t n,               // size(B,2) & size(C,2)
                          const size_t k,               // size(A,2) & size(B,1) <= 2^17

@@ -104,12 +104,12 @@ std::vector<double> getWatt(const std::function<void(void)> func, const size_t m
     std::vector<PowerProfile> powerUsages;
     powerUsages = getGpuPowerUsage(
         [&]() {
-            cudaDeviceSynchronize();
+            gpuDeviceSynchronize();
             const auto start_clock = std::chrono::system_clock::now();
             while (true) {
                 func();
                 if (((++cnt) % 10) == 0) {
-                    cudaDeviceSynchronize();
+                    gpuDeviceSynchronize();
                     const auto current_clock = std::chrono::system_clock::now();
                     const auto elapsed_time =
                         std::chrono::duration_cast<std::chrono::microseconds>(current_clock - start_clock).count() * 1e-6;

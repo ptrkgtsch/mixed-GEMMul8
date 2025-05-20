@@ -1,18 +1,31 @@
 cmake_minimum_required(VERSION 3.18)
-project(GEMMul8 LANGUAGES CXX CUDA)
+if (NOT CMAKE_GPU_RUNTIME)
+    set(GPU_RUNTIME "CUDA" CACHE STRING "Switches between HIP and CUDA")
+else (NOT CMAKE_GPU_RUNTIME)
+    set(GPU_RUNTIME "${CMAKE_GPU_RUNTIME}" CACHE STRING "Switches between HIP and CUDA")
+endif (NOT CMAKE_GPU_RUNTIME)
 
-find_package(CUDA 11.0 REQUIRED)
-find_package(CUDAToolkit REQUIRED)
+project(GEMMul8 LANGUAGES CXX ${GPU_RUNTIME})
 
-# CUDA/CXX
-foreach(lang CXX CUDA)
+if (${GPU_RUNTIME} MATCHES "HIP")
+    set (VECTORADD_CXX_FLAGS "-fPIC")
+    find_package(HIP 6.2.0 REQUIRED)
+    find_package(hipblas REQUIRED)
+    add_compile_definitions(OCML_BASIC_ROUNDED_OPERATIONS) # for _ru and _rd modes (slow!)
+    add_compile_definitions(HIP_ENABLE_WARP_SYNC_BUILTINS) # for __shfl_down_sync
+elseif (${GPU_RUNTIME} MATCHES "CUDA")
+    find_package(CUDA 11.0 REQUIRED)
+    find_package(CUDAToolkit REQUIRED)
+    set(CMAKE_CUDA_ARCHITECTURES 80)
+else ()
+    message (FATAL_ERROR "GPU runtime not supported!")
+endif ()
+
+foreach(lang CXX ${GPU_RUNTIME})
     set(CMAKE_${lang}_STANDARD 20)
     set(CMAKE_${lang}_STANDARD_REQUIRED ON)
     set(CMAKE_${lang}_EXTENSIONS OFF)
 endforeach()
-
-# CUDA (1/2)
-set(CMAKE_CUDA_ARCHITECTURES 80)
 
 # Directories
 set(INCDIR include)
@@ -25,6 +38,9 @@ file(GLOB HEADERS "${INCDIR}/*.hpp")
 set(CU_FILES
     ${SRCDIR}/gemmul8.cu
 )
+if (${GPU_RUNTIME} MATCHES HIP)
+    set_source_files_properties(${SRCDIR}/gemmul8.cu PROPERTIES LANGUAGE HIP)
+endif ()
 
 # Create an object library for the CUDA sources
 add_library(gemmul8_objs OBJECT ${CU_FILES})
@@ -34,7 +50,11 @@ target_include_directories(gemmul8_objs PUBLIC ${INCDIR})
 # Create a static library from the object library
 add_library(gemmul8_static STATIC $<TARGET_OBJECTS:gemmul8_objs>)
 set_target_properties(gemmul8_static PROPERTIES OUTPUT_NAME "gemmul8")  # Rename output to gemmul8.a (use only if shared not included)
-target_link_libraries(gemmul8_static PRIVATE cublas cudart cuda)
+if (${GPU_RUNTIME} MATCHES "CUDA")
+    target_link_libraries(gemmul8_static PRIVATE cublas cudart cuda)
+else ()
+    target_link_libraries(gemmul8_static ${HIP_LIBRARIES})
+endif ()
 
 # Create a shared library from the object library
 # add_library(gemmul8 SHARED $<TARGET_OBJECTS:gemmul8_objs>)

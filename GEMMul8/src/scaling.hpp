@@ -42,34 +42,70 @@ template <> __forceinline__ __device__ double __Tfma_ru<double>(double in1, doub
 template <> __forceinline__ __device__ float __Tfma_ru<float>(float in1, float in2, float in3) { return __fmaf_ru(in1, in2, in3); };
 
 template <typename T> __forceinline__ __device__ void inner_warp_max(T &amax) {
+#if defined(__NVCC__)
     amax = max(amax, __shfl_down_sync(0xFFFFFFFFu, amax, 16)); // warp-level reduction
     amax = max(amax, __shfl_down_sync(0xFFFFFFFFu, amax, 8));  // warp-level reduction
     amax = max(amax, __shfl_down_sync(0xFFFFFFFFu, amax, 4));  // warp-level reduction
     amax = max(amax, __shfl_down_sync(0xFFFFFFFFu, amax, 2));  // warp-level reduction
     amax = max(amax, __shfl_down_sync(0xFFFFFFFFu, amax, 1));  // warp-level reduction
+#endif
+#if defined(__HIPCC__)
+    amax = max(amax, __shfl_down_sync(0xFFFFFFFFUL, amax, 16)); // warp-level reduction
+    amax = max(amax, __shfl_down_sync(0xFFFFFFFFUL, amax, 8));  // warp-level reduction
+    amax = max(amax, __shfl_down_sync(0xFFFFFFFFUL, amax, 4));  // warp-level reduction
+    amax = max(amax, __shfl_down_sync(0xFFFFFFFFUL, amax, 2));  // warp-level reduction
+    amax = max(amax, __shfl_down_sync(0xFFFFFFFFUL, amax, 1));  // warp-level reduction
+#endif
 }
 
 template <typename T> __forceinline__ __device__ void inner_warp_sum(T &sum);
 template <> __forceinline__ __device__ void inner_warp_sum<double>(double &sum) {
+#if defined(__NVCC__)
     sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFu, sum, 16)); // warp-level reduction
     sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFu, sum, 8));  // warp-level reduction
     sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFu, sum, 4));  // warp-level reduction
     sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFu, sum, 2));  // warp-level reduction
     sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFu, sum, 1));  // warp-level reduction
+#endif
+#if defined(__HIPCC__)
+    sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 16)); // warp-level reduction
+    sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 8));  // warp-level reduction
+    sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 4));  // warp-level reduction
+    sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 2));  // warp-level reduction
+    sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 1));  // warp-level reduction
+#endif
 }
 template <> __forceinline__ __device__ void inner_warp_sum<float>(float &sum) {
+#if defined(__NVCC__)
     sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFu, sum, 16)); // warp-level reduction
     sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFu, sum, 8));  // warp-level reduction
     sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFu, sum, 4));  // warp-level reduction
     sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFu, sum, 2));  // warp-level reduction
     sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFu, sum, 1));  // warp-level reduction
+#endif
+#if defined(__HIPCC__)
+    sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 16)); // warp-level reduction
+    sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 8));  // warp-level reduction
+    sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 4));  // warp-level reduction
+    sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 2));  // warp-level reduction
+    sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 1));  // warp-level reduction
+#endif
 }
 template <> __forceinline__ __device__ void inner_warp_sum<int32_t>(int32_t &sum) {
+#if defined(__NVCC__)
     sum += __shfl_down_sync(0xFFFFFFFFu, sum, 16); // warp-level reduction
     sum += __shfl_down_sync(0xFFFFFFFFu, sum, 8);  // warp-level reduction
     sum += __shfl_down_sync(0xFFFFFFFFu, sum, 4);  // warp-level reduction
     sum += __shfl_down_sync(0xFFFFFFFFu, sum, 2);  // warp-level reduction
     sum += __shfl_down_sync(0xFFFFFFFFu, sum, 1);  // warp-level reduction
+#endif
+#if defined(__HIPCC__)
+    sum += __shfl_down_sync(0xFFFFFFFFUL, sum, 16); // warp-level reduction
+    sum += __shfl_down_sync(0xFFFFFFFFUL, sum, 8);  // warp-level reduction
+    sum += __shfl_down_sync(0xFFFFFFFFUL, sum, 4);  // warp-level reduction
+    sum += __shfl_down_sync(0xFFFFFFFFUL, sum, 2);  // warp-level reduction
+    sum += __shfl_down_sync(0xFFFFFFFFUL, sum, 1);  // warp-level reduction
+#endif
 }
 
 template <typename T>
@@ -415,68 +451,10 @@ __global__ void scalingB_kernel(const size_t m,                         // size(
     }
 }
 
-/*template <typename T1, typename T2 = T1> // will only run if types are different because of below specialization
-std::enable_if_t<
-    std::is_same_v<T1, double> || std::is_same_v<T2, double>,
-    void
-> // If one of the types is double
-__inline__ scaling(cublasHandle_t handle,        // handle
-                        const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                        const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
-                        const size_t m,               // size(A,1) & size(C,1)
-                        const size_t n,               // size(B,2) & size(C,2)
-                        const size_t k,               // size(A,2) & size(B,1)
-                        const unsigned num_moduli,    // #moduli
-                        const T1 *const A,             // input
-                        const size_t lda,             // leading dimension
-                        const T2 *const B,             // input
-                        const size_t ldb,             // leading dimension
-                        int8_t *const A8i,            // output (k * m)
-                        const size_t lda8i,           // leading dimension
-                        int16_t *const sftA,          // exponent of shift values for rows of A
-                        int8_t *const B8i,            // output (k * n)
-                        const size_t ldb8i,           // leading dimension
-                        int16_t *const sftB,          // exponent of shift values for cols of B
-                        int32_t *const C32i,          // tmp (m * n)
-                        const unsigned table_idx)     //
-{
-    // extract first 7-bit from A and B
-    if (op_A == CUBLAS_OP_N) {
-        extract_A8i_kernel<T1><<<m, oz2_const::threads_scaling>>>(k, A, lda, A8i, lda8i, sftA);
-    } else {
-        extract_B8i_kernel<T1><<<m, oz2_const::threads_scaling>>>(k, A, lda, A8i, lda8i, sftA);
-    }
-    if (op_B == CUBLAS_OP_N) {
-        extract_B8i_kernel<T2><<<n, oz2_const::threads_scaling>>>(k, B, ldb, B8i, ldb8i, sftB);
-    } else {
-        extract_A8i_kernel<T2><<<n, oz2_const::threads_scaling>>>(k, B, ldb, B8i, ldb8i, sftB);
-    }
-
-    // C32i := A8i^T*B8i
-    constexpr int32_t alpha = 1;
-    constexpr int32_t beta  = 0;
-    cudaDeviceSynchronize();
-    cublasGemmEx(handle, CUBLAS_OP_T, CUBLAS_OP_N, m, n, lda8i, &alpha, A8i, CUDA_R_8I, lda8i, B8i, CUDA_R_8I, ldb8i, &beta, C32i, CUDA_R_32I, m, CUBLAS_COMPUTE_32I, CUBLAS_GEMM_DEFAULT);
-
-    // extract high order bits from A and B
-    cudaDeviceSynchronize();
-    const float log2M = oz2_table::int8tc::log2M[table_idx]; // fld(log2(M-1)/2 - 0.5)
-    if (op_A == CUBLAS_OP_N) {
-        scalingA_kernel<T1, double><<<m, oz2_const::threads_scaling>>>(n, k, lda8i * m, num_moduli, A, lda, C32i, m, A8i, lda8i, sftA, log2M);
-    } else {
-        scalingB_kernel<T1, double><<<m, oz2_const::threads_scaling>>>(m, k, lda8i * m, num_moduli, A, lda, C32i, m, A8i, lda8i, sftA, log2M);
-    }
-    if (op_B == CUBLAS_OP_N) {
-        scalingB_kernel<T2, double><<<n, oz2_const::threads_scaling>>>(m, k, ldb8i * n, num_moduli, B, ldb, C32i, m, B8i, ldb8i, sftB, log2M);
-    } else {
-        scalingA_kernel<T2, double><<<n, oz2_const::threads_scaling>>>(n, k, ldb8i * n, num_moduli, B, ldb, C32i, m, B8i, ldb8i, sftB, log2M);
-    }
-}*/
-
 template <typename TA, typename TB>
-__inline__ void scaling(cublasHandle_t handle,        // handle
-                        const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                        const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+__inline__ void scaling(gpublasHandle_t handle,        // handle
+                        const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                        const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                         const size_t m,               // size(A,1) & size(C,1)
                         const size_t n,               // size(B,2) & size(C,2)
                         const size_t k,               // size(A,2) & size(B,1)
@@ -495,12 +473,12 @@ __inline__ void scaling(cublasHandle_t handle,        // handle
                         const unsigned table_idx)     //
 {
     // extract first 7-bit from A and B
-    if (op_A == CUBLAS_OP_N) {
+    if (op_A == GPUBLAS_OP_N) {
         extract_A8i_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, A, lda, A8i, lda8i, sftA);
     } else {
         extract_B8i_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, A, lda, A8i, lda8i, sftA);
     }
-    if (op_B == CUBLAS_OP_N) {
+    if (op_B == GPUBLAS_OP_N) {
         extract_B8i_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, B, ldb, B8i, ldb8i, sftB);
     } else {
         extract_A8i_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, B, ldb, B8i, ldb8i, sftB);
@@ -509,18 +487,18 @@ __inline__ void scaling(cublasHandle_t handle,        // handle
     // C32i := A8i^T*B8i
     constexpr int32_t alpha = 1;
     constexpr int32_t beta  = 0;
-    cudaDeviceSynchronize();
-    cublasGemmEx(handle, CUBLAS_OP_T, CUBLAS_OP_N, m, n, lda8i, &alpha, A8i, CUDA_R_8I, lda8i, B8i, CUDA_R_8I, ldb8i, &beta, C32i, CUDA_R_32I, m, CUBLAS_COMPUTE_32I, CUBLAS_GEMM_DEFAULT);
+    gpuDeviceSynchronize();
+    gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, lda8i, &alpha, A8i, GPU_R_8I, lda8i, B8i, GPU_R_8I, ldb8i, &beta, C32i, GPU_R_32I, m, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
 
     // extract high order bits from A and B
-    cudaDeviceSynchronize();
+    gpuDeviceSynchronize();
     const float log2M = oz2_table::int8tc::log2M[table_idx]; // fld(log2(M-1)/2 - 0.5)
-    if (op_A == CUBLAS_OP_N) {
+    if (op_A == GPUBLAS_OP_N) {
         scalingA_kernel<TA><<<m, oz2_const::threads_scaling>>>(n, k, lda8i * m, num_moduli, A, lda, C32i, m, A8i, lda8i, sftA, log2M);
     } else {
         scalingB_kernel<TA><<<m, oz2_const::threads_scaling>>>(m, k, lda8i * m, num_moduli, A, lda, C32i, m, A8i, lda8i, sftA, log2M);
     }
-    if (op_B == CUBLAS_OP_N) {
+    if (op_B == GPUBLAS_OP_N) {
         scalingB_kernel<TB><<<n, oz2_const::threads_scaling>>>(m, k, ldb8i * n, num_moduli, B, ldb, C32i, m, B8i, ldb8i, sftB, log2M);
     } else {
         scalingA_kernel<TB><<<n, oz2_const::threads_scaling>>>(n, k, ldb8i * n, num_moduli, B, ldb, C32i, m, B8i, ldb8i, sftB, log2M);
@@ -683,8 +661,8 @@ std::enable_if_t<
     std::is_same_v<T1, double> || std::is_same_v<T2, double>,
     void
 > // If one of the types is double
-__inline__ scaling(const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                        const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+__inline__ scaling(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                        const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                         const size_t m,               // size(A,1) & size(C,1)
                         const size_t n,               // size(B,2) & size(C,2)
                         const size_t k,               // size(A,2) & size(B,1)
@@ -702,12 +680,12 @@ __inline__ scaling(const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
                         const unsigned table_idx)     //
 {
     const float log2M = (k < 64) ? (oz2_table::vecnorm::log2M[table_idx] - 3) : oz2_table::vecnorm::log2M[table_idx]; // fld(log2(M-1)/2 - 1.5)
-    if (op_A == CUBLAS_OP_N) {
+    if (op_A == GPUBLAS_OP_N) {
         scalingA_kernel<T1, double><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     } else {
         scalingB_kernel<T1, double><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
-    if (op_B == CUBLAS_OP_N) {
+    if (op_B == GPUBLAS_OP_N) {
         scalingB_kernel<T2, double><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     } else {
         scalingA_kernel<T2, double><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
@@ -715,8 +693,8 @@ __inline__ scaling(const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
 }*/
 
 template <typename TA, typename TB>
-__inline__ void scaling(const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                        const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+__inline__ void scaling(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                        const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                         const size_t m,               // size(A,1) & size(C,1)
                         const size_t n,               // size(B,2) & size(C,2)
                         const size_t k,               // size(A,2) & size(B,1)
@@ -734,12 +712,12 @@ __inline__ void scaling(const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_O
                         const unsigned table_idx)     //
 {
     const float log2M = (k < 64) ? (oz2_table::vecnorm::log2M[table_idx] - 3) : oz2_table::vecnorm::log2M[table_idx]; // fld(log2(M-1)/2 - 1.5)
-    if (op_A == CUBLAS_OP_N) {
+    if (op_A == GPUBLAS_OP_N) {
         scalingA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     } else {
         scalingB_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
-    if (op_B == CUBLAS_OP_N) {
+    if (op_B == GPUBLAS_OP_N) {
         scalingB_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     } else {
         scalingA_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);

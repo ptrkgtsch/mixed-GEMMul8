@@ -3,11 +3,10 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <cublas_v2.h>
-#include <cuda_runtime.h>
-#include <curand_kernel.h>
 #include <random>
 #include <vector>
+
+#include "gpu_arch.hpp"
 
 namespace oz2_const {
 

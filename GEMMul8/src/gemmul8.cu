@@ -7,12 +7,12 @@
 
 namespace {
 void timing_start(std::chrono::system_clock::time_point &timetmp) {
-    cudaDeviceSynchronize();
+    gpuDeviceSynchronize();
     timetmp = std::chrono::system_clock::now();
 }
 
 void timing_stop(std::chrono::system_clock::time_point &timetmp, double &timer) {
-    cudaDeviceSynchronize();
+    gpuDeviceSynchronize();
     timer += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now() - timetmp).count();
 }
 
@@ -46,9 +46,9 @@ size_t workSize(const size_t m,            // size(A,1) & size(C,1) <= 2^17
 }
 
 template <>
-std::vector<double> gemm<double>(cublasHandle_t handle,        // handle
-                                 const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
+                                 const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                                 const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                                  const size_t m,               // size(A,1) & size(C,1) <= 2^17
                                  const size_t n,               // size(B,2) & size(C,2) <= 2^17
                                  const size_t k,               // size(A,2) & size(B,1) <= 2^17
@@ -116,11 +116,11 @@ std::vector<double> gemm<double>(cublasHandle_t handle,        // handle
     int16_t *sftB = sftA + size_vecA;                                      // (n+15)/16*16*sizeof(int16_t)
 
     if (is_numM_1) {
-        cudaMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_1[table_idx][0], num_moduli * sizeof(double));
+        gpuMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_1[table_idx][0], num_moduli * sizeof(double));
     } else {
-        cudaMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_2[num_moduli - 8][0][0], 2 * num_moduli * sizeof(double));
+        gpuMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_2[num_moduli - 8][0][0], 2 * num_moduli * sizeof(double));
     }
-    cudaMemcpyToSymbol(oz2_table::moduli_dev, oz2_table::moduli, num_moduli * sizeof(oz2_table::tab_t<double>));
+    gpuMemcpyToSymbol(oz2_table::moduli_dev, oz2_table::moduli, num_moduli * sizeof(oz2_table::tab_t<double>));
 
     //------------------------------
     // Scaling
@@ -144,7 +144,7 @@ std::vector<double> gemm<double>(cublasHandle_t handle,        // handle
         // C32i := A8i*B8i
         //------------------------------
         timing_start(timetmp);
-        cublasGemmEx(handle, CUBLAS_OP_T, CUBLAS_OP_N, m, n, lda8i, &one, A8i + i * sizeA, CUDA_R_8I, lda8i, B8i + i * sizeB, CUDA_R_8I, ldb8i, &zero, C32i, CUDA_R_32I, m, CUBLAS_COMPUTE_32I, CUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         timing_stop(timetmp, timer[1]);
 
         //------------------------------
@@ -174,9 +174,9 @@ std::vector<double> gemm<double>(cublasHandle_t handle,        // handle
 }
 
 template <>
-std::vector<double> gemm<float>(cublasHandle_t handle,        // handle
-                                const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                                const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
+                                const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                                const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                                 const size_t m,               // size(A,1) & size(C,1) <= 2^17
                                 const size_t n,               // size(B,2) & size(C,2) <= 2^17
                                 const size_t k,               // size(A,2) & size(B,1) <= 2^17
@@ -241,8 +241,8 @@ std::vector<double> gemm<float>(cublasHandle_t handle,        // handle
     int16_t *sftA = reinterpret_cast<int16_t *>(C32i + sizeC);             // (m+15)/16*16*sizeof(int16_t)
     int16_t *sftB = sftA + size_vecA;                                      // (n+15)/16*16*sizeof(int16_t)
 
-    cudaMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_1[table_idx][0], num_moduli * sizeof(double));
-    cudaMemcpyToSymbol(oz2_table::modulif_dev, oz2_table::modulif, num_moduli * sizeof(oz2_table::tab_t<float>));
+    gpuMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_1[table_idx][0], num_moduli * sizeof(double));
+    gpuMemcpyToSymbol(oz2_table::modulif_dev, oz2_table::modulif, num_moduli * sizeof(oz2_table::tab_t<float>));
 
     //------------------------------
     // Scaling
@@ -266,7 +266,7 @@ std::vector<double> gemm<float>(cublasHandle_t handle,        // handle
         // C32i := A8i*B8i
         //------------------------------
         timing_start(timetmp);
-        cublasGemmEx(handle, CUBLAS_OP_T, CUBLAS_OP_N, m, n, lda8i, &one, A8i + i * sizeA, CUDA_R_8I, lda8i, B8i + i * sizeB, CUDA_R_8I, ldb8i, &zero, C32i, CUDA_R_32I, m, CUBLAS_COMPUTE_32I, CUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         timing_stop(timetmp, timer[1]);
 
         //------------------------------
@@ -296,9 +296,9 @@ std::vector<double> gemm<float>(cublasHandle_t handle,        // handle
 }
 
 template <typename TA, typename TB, typename TC>
-std::vector<double> gemm_mixed(cublasHandle_t handle,          // handle
-                                 const cublasOperation_t op_A, // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const cublasOperation_t op_B, // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm_mixed(gpublasHandle_t handle,          // handle
+                                 const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
+                                 const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
                                  const size_t m,               // size(A,1) & size(C,1) <= 2^17
                                  const size_t n,               // size(B,2) & size(C,2) <= 2^17
                                  const size_t k,               // size(A,2) & size(B,1) <= 2^17
@@ -366,12 +366,12 @@ std::vector<double> gemm_mixed(cublasHandle_t handle,          // handle
     int16_t *sftB = sftA + size_vecA;                                      // (n+15)/16*16*sizeof(int16_t)
 
     if (is_numM_1) {
-        cudaMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_1[table_idx][0], num_moduli * sizeof(double));
+        gpuMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_1[table_idx][0], num_moduli * sizeof(double));
     } else {
-        cudaMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_2[num_moduli - 8][0][0], 2 * num_moduli * sizeof(double));
+        gpuMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_2[num_moduli - 8][0][0], 2 * num_moduli * sizeof(double));
     }
-    cudaMemcpyToSymbol(oz2_table::moduli_dev, oz2_table::moduli, num_moduli * sizeof(oz2_table::tab_t<double>));
-    cudaMemcpyToSymbol(oz2_table::modulif_dev, oz2_table::modulif, num_moduli * sizeof(oz2_table::tab_t<float>));
+    gpuMemcpyToSymbol(oz2_table::moduli_dev, oz2_table::moduli, num_moduli * sizeof(oz2_table::tab_t<double>));
+    gpuMemcpyToSymbol(oz2_table::modulif_dev, oz2_table::modulif, num_moduli * sizeof(oz2_table::tab_t<float>));
 
     //------------------------------
     // Scaling
@@ -395,7 +395,7 @@ std::vector<double> gemm_mixed(cublasHandle_t handle,          // handle
         // C32i := A8i*B8i
         //------------------------------
         timing_start(timetmp);
-        cublasGemmEx(handle, CUBLAS_OP_T, CUBLAS_OP_N, m, n, lda8i, &one, A8i + i * sizeA, CUDA_R_8I, lda8i, B8i + i * sizeB, CUDA_R_8I, ldb8i, &zero, C32i, CUDA_R_32I, m, CUBLAS_COMPUTE_32I, CUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         timing_stop(timetmp, timer[1]);
 
         //------------------------------
@@ -425,9 +425,9 @@ std::vector<double> gemm_mixed(cublasHandle_t handle,          // handle
 }
 
 template <>
-std::vector<double> gemm<double, float, double>(cublasHandle_t handle, // handle
-                                 const cublasOperation_t op_A,         // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const cublasOperation_t op_B,         // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm<double, float, double>(gpublasHandle_t handle, // handle
+                                 const gpublasOperation_t op_A,         // GPUBLAS_OP_N or GPUBLAS_OP_T
+                                 const gpublasOperation_t op_B,         // GPUBLAS_OP_N or GPUBLAS_OP_T
                                  const size_t m,                       // size(A,1) & size(C,1) <= 2^17
                                  const size_t n,                       // size(B,2) & size(C,2) <= 2^17
                                  const size_t k,                       // size(A,2) & size(B,1) <= 2^17
@@ -447,9 +447,9 @@ std::vector<double> gemm<double, float, double>(cublasHandle_t handle, // handle
 }
 
 template <>
-std::vector<double> gemm<float, double, double>(cublasHandle_t handle, // handle
-                                 const cublasOperation_t op_A,         // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const cublasOperation_t op_B,         // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm<float, double, double>(gpublasHandle_t handle, // handle
+                                 const gpublasOperation_t op_A,         // GPUBLAS_OP_N or GPUBLAS_OP_T
+                                 const gpublasOperation_t op_B,         // GPUBLAS_OP_N or GPUBLAS_OP_T
                                  const size_t m,                       // size(A,1) & size(C,1) <= 2^17
                                  const size_t n,                       // size(B,2) & size(C,2) <= 2^17
                                  const size_t k,                       // size(A,2) & size(B,1) <= 2^17
@@ -469,9 +469,9 @@ std::vector<double> gemm<float, double, double>(cublasHandle_t handle, // handle
 }
 
 template <>
-std::vector<double> gemm<double, float, float>(cublasHandle_t handle, // handle
-                                 const cublasOperation_t op_A,        // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const cublasOperation_t op_B,        // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm<double, float, float>(gpublasHandle_t handle, // handle
+                                 const gpublasOperation_t op_A,        // GPUBLAS_OP_N or GPUBLAS_OP_T
+                                 const gpublasOperation_t op_B,        // GPUBLAS_OP_N or GPUBLAS_OP_T
                                  const size_t m,                      // size(A,1) & size(C,1) <= 2^17
                                  const size_t n,                      // size(B,2) & size(C,2) <= 2^17
                                  const size_t k,                      // size(A,2) & size(B,1) <= 2^17
@@ -491,9 +491,9 @@ std::vector<double> gemm<double, float, float>(cublasHandle_t handle, // handle
 }
 
 template <>
-std::vector<double> gemm<float, double, float>(cublasHandle_t handle, // handle
-                                 const cublasOperation_t op_A,        // CUBLAS_OP_N or CUBLAS_OP_T
-                                 const cublasOperation_t op_B,        // CUBLAS_OP_N or CUBLAS_OP_T
+std::vector<double> gemm<float, double, float>(gpublasHandle_t handle, // handle
+                                 const gpublasOperation_t op_A,        // GPUBLAS_OP_N or GPUBLAS_OP_T
+                                 const gpublasOperation_t op_B,        // GPUBLAS_OP_N or GPUBLAS_OP_T
                                  const size_t m,                      // size(A,1) & size(C,1) <= 2^17
                                  const size_t n,                      // size(B,2) & size(C,2) <= 2^17
                                  const size_t k,                      // size(A,2) & size(B,1) <= 2^17
