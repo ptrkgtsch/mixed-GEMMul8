@@ -38,8 +38,14 @@ template <> __forceinline__ __device__ float Tzero<float>() { return 0.0F; };
 template <> __forceinline__ __device__ int32_t Tzero<int32_t>() { return 0; };
 
 template <typename T> __forceinline__ __device__ T __Tfma_ru(T in1, T in2, T in3);
+#if defined(__NVCC__)
 template <> __forceinline__ __device__ double __Tfma_ru<double>(double in1, double in2, double in3) { return __fma_ru(in1, in2, in3); };
 template <> __forceinline__ __device__ float __Tfma_ru<float>(float in1, float in2, float in3) { return __fmaf_ru(in1, in2, in3); };
+#endif
+#if defined(__HIPCC__)
+    template <> __forceinline__ __device__ double __Tfma_ru<double>(double in1, double in2, double in3) { return __fma_rn(in1, in2, in3); };
+    template <> __forceinline__ __device__ float __Tfma_ru<float>(float in1, float in2, float in3) { return __fmaf_rn(in1, in2, in3); };
+#endif
 
 template <typename T> __forceinline__ __device__ void inner_warp_max(T &amax) {
 #if defined(__NVCC__)
@@ -68,11 +74,11 @@ template <> __forceinline__ __device__ void inner_warp_sum<double>(double &sum) 
     sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFu, sum, 1));  // warp-level reduction
 #endif
 #if defined(__HIPCC__)
-    sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 16)); // warp-level reduction
-    sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 8));  // warp-level reduction
-    sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 4));  // warp-level reduction
-    sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 2));  // warp-level reduction
-    sum = __dadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 1));  // warp-level reduction
+    sum = __dadd_rn(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 16)); // warp-level reduction
+    sum = __dadd_rn(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 8));  // warp-level reduction
+    sum = __dadd_rn(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 4));  // warp-level reduction
+    sum = __dadd_rn(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 2));  // warp-level reduction
+    sum = __dadd_rn(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 1));  // warp-level reduction
 #endif
 }
 template <> __forceinline__ __device__ void inner_warp_sum<float>(float &sum) {
@@ -84,11 +90,11 @@ template <> __forceinline__ __device__ void inner_warp_sum<float>(float &sum) {
     sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFu, sum, 1));  // warp-level reduction
 #endif
 #if defined(__HIPCC__)
-    sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 16)); // warp-level reduction
-    sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 8));  // warp-level reduction
-    sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 4));  // warp-level reduction
-    sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 2));  // warp-level reduction
-    sum = __fadd_ru(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 1));  // warp-level reduction
+    sum = __fadd_rn(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 16)); // warp-level reduction
+    sum = __fadd_rn(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 8));  // warp-level reduction
+    sum = __fadd_rn(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 4));  // warp-level reduction
+    sum = __fadd_rn(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 2));  // warp-level reduction
+    sum = __fadd_rn(sum, __shfl_down_sync(0xFFFFFFFFUL, sum, 1));  // warp-level reduction
 #endif
 }
 template <> __forceinline__ __device__ void inner_warp_sum<int32_t>(int32_t &sum) {
@@ -152,6 +158,9 @@ __device__ T find_amax_and_nrm(const T *const ptr,    //
     // max in thread
     T amax = Tzero<T>();
     T sum  = Tzero<T>();
+#if defined(__HIPCC__)
+    asm volatile ("s_round_mode 5" : "=r" (sum)); // _ru
+#endif
     for (unsigned i = threadIdx.x; i < length; i += blockDim.x) {
         T tmp = Tabs<T>(ptr[i * inc]);
         amax  = max(amax, tmp);
@@ -182,6 +191,9 @@ __device__ T find_amax_and_nrm(const T *const ptr,    //
         inner_warp_sum<T>(sum);
         if (threadIdx.x == 32) shm2[0] = sum;
     }
+#if defined(__HIPCC__)
+    asm volatile ("s_round_mode 0" : "=r" (vecnrm)); // _rn
+#endif
 
     __syncthreads();
     vecnrm = shm2[0];
@@ -211,7 +223,18 @@ template <> __device__ int8_t mod_8i<float>(float a, unsigned j) {
 namespace int8tc {
 
 __forceinline__ __device__ int compute_sft(int amax, int16_t sftA, const float log2M) {
+#if defined(__NVCC__)
     return sftA + __float2int_rd(__fmaf_rd(-0.51F, __log2f(__int2float_rn(amax)), log2M));
+#endif
+#if defined(__HIPCC__)
+    float temp;
+    asm volatile ("s_round_mode 10" : "=r" (temp)); // _rd
+    temp = __fmaf_rn(-0.51F, __log2f(__int2float_rn(amax)), log2M);
+    int ret;
+    asm volatile ("s_round_mode 0" : "=r" (ret));
+    ret = sftA + __float2int_rd(temp);
+    return ret;
+#endif
 }
 
 template <typename T>
@@ -513,11 +536,32 @@ template <typename T> __forceinline__ __device__ int compute_sft(T amax, T vecnr
 template <> __forceinline__ __device__ int compute_sft<double>(double amax, double vecnrm, const float log2M) {
     const int exponent  = ilogb(vecnrm);
     const float vecnrmf = __double2float_ru(scalbn(vecnrm, -exponent));
+#if defined(__NVCC__)
     const int k         = __float2int_rd(__fmaf_rd(-0.51F, __fadd_ru(__log2f(vecnrmf), exponent), log2M));
+#endif
+#if defined(__HIPCC__)
+    float temp;
+    asm volatile ("s_round_mode 10" : "=r" (temp)); // _rd
+    temp = __fmaf_rn(-0.51F, __fadd_rn(__log2f(vecnrmf), exponent), log2M);
+    int k;
+    asm volatile ("s_round_mode 0" : "=r" (k));
+    k         = __float2int_rd(temp);
+#endif
     return k - ilogb(amax);
 }
 template <> __forceinline__ __device__ int compute_sft<float>(float amax, float vecnrm, const float log2M) {
+#if defined(__NVCC__)
     return __float2int_rd(__fmaf_rd(-0.51F, __log2f(vecnrm), log2M)) - ilogbf(amax);
+#endif
+#if defined(__HIPCC__)
+    float temp;
+    asm volatile ("s_round_mode 10" : "=r" (temp)); // _rd
+    temp = __fmaf_rn(-0.51F, __log2f(vecnrm), log2M);
+    int ret;
+    asm volatile ("s_round_mode 0" : "=r" (ret));
+    ret = __float2int_rd(temp) - ilogbf(amax);
+    return ret;
+#endif
 }
 
 template <typename T>
@@ -655,42 +699,6 @@ __global__ void scalingB_kernel(const size_t k,                   // size(B,1)
         }
     }
 }
-
-/*template <typename T1, typename T2 = T1> // will only run if types are different because of below specialization
-std::enable_if_t<
-    std::is_same_v<T1, double> || std::is_same_v<T2, double>,
-    void
-> // If one of the types is double
-__inline__ scaling(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
-                        const gpublasOperation_t op_B, // GPUBLAS_OP_N or GPUBLAS_OP_T
-                        const size_t m,               // size(A,1) & size(C,1)
-                        const size_t n,               // size(B,2) & size(C,2)
-                        const size_t k,               // size(A,2) & size(B,1)
-                        const unsigned num_moduli,    // #moduli
-                        const T1 *const A,            // input
-                        const size_t lda,             // leading dimension
-                        const T2 *const B,            // input
-                        const size_t ldb,             // leading dimension
-                        int8_t *const A8i,            // output (k * m)
-                        const size_t lda8i,           // leading dimension
-                        int16_t *const sftA,          // exponent of shift values for rows of A
-                        int8_t *const B8i,            // output (k * n)
-                        const size_t ldb8i,           // leading dimension
-                        int16_t *const sftB,          // exponent of shift values for cols of B
-                        const unsigned table_idx)     //
-{
-    const float log2M = (k < 64) ? (oz2_table::vecnorm::log2M[table_idx] - 3) : oz2_table::vecnorm::log2M[table_idx]; // fld(log2(M-1)/2 - 1.5)
-    if (op_A == GPUBLAS_OP_N) {
-        scalingA_kernel<T1, double><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
-    } else {
-        scalingB_kernel<T1, double><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
-    }
-    if (op_B == GPUBLAS_OP_N) {
-        scalingB_kernel<T2, double><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
-    } else {
-        scalingA_kernel<T2, double><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
-    }
-}*/
 
 template <typename TA, typename TB>
 __inline__ void scaling(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLAS_OP_T
