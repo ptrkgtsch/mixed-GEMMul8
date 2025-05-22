@@ -11,7 +11,7 @@ if (${GPU_RUNTIME} MATCHES "HIP")
     set (VECTORADD_CXX_FLAGS "-fPIC")
     find_package(HIP 6.2.0 REQUIRED)
     find_package(hipblas REQUIRED)
-    # add_compile_definitions(OCML_BASIC_ROUNDED_OPERATIONS) # for _ru and _rd modes (slow!)
+    add_compile_definitions(OCML_BASIC_ROUNDED_OPERATIONS) # for _ru and _rd modes (slow!)
     add_compile_definitions(HIP_ENABLE_WARP_SYNC_BUILTINS) # for __shfl_down_sync
     add_compile_options(-Wno-unused-result)
 elseif (${GPU_RUNTIME} MATCHES "CUDA")
