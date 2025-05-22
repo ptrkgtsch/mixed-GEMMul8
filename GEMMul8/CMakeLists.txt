@@ -17,7 +17,12 @@ if (${GPU_RUNTIME} MATCHES "HIP")
 elseif (${GPU_RUNTIME} MATCHES "CUDA")
     find_package(CUDA 11.0 REQUIRED)
     find_package(CUDAToolkit REQUIRED)
-    set(CMAKE_CUDA_ARCHITECTURES 80)
+    execute_process(COMMAND nvidia-smi --query-gpu=compute_cap --format=csv,noheader
+            OUTPUT_VARIABLE GPU_ARCH
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+    string(REPLACE "." "" GPU_ARCH ${GPU_ARCH})  # Remove the dot from the architecture
+    set(CMAKE_CUDA_ARCHITECTURES ${GPU_ARCH})
+    add_compile_definitions(GEMMul8_ARCH=${GPU_ARCH})
 else ()
     message (FATAL_ERROR "GPU runtime not supported!")
 endif ()
