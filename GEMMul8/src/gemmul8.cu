@@ -271,7 +271,7 @@ std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
 
         //------------------------------
         // Calculating mod
-        // C8u[i] := mod(C32i + 128*A8i*E + 128*E*B8i + 16384*E*E, modulus[i])
+        // C8u[i] := mod(C32i, modulus[i]) >= 0
         //------------------------------
         timing_start(timetmp);
         oz2_util::conv_32i_2_8u(i, sizeC, C32i, C8u + i * sizeC);

@@ -514,20 +514,17 @@ template <> __forceinline__ __device__ int compute_sft<double>(double amax, doub
     const int exponent  = ilogb(vecnrm);
     const float vecnrmf = __double2float_ru(scalbn(vecnrm, -exponent));
     const int k         = __float2int_rd(__fmaf_rd(-0.51F, __fadd_ru(__log2f(vecnrmf), exponent), log2M));
-    return k - ilogb(amax);
+    return min(__float2int_rd(log2M - 1.0f), k) - ilogb(amax);
 }
 template <> __forceinline__ __device__ int compute_sft<float>(float amax, float vecnrm, const float log2M) {
-    return __float2int_rd(__fmaf_rd(-0.51F, __log2f(vecnrm), log2M)) - ilogbf(amax);
+    const int k = __float2int_rd(__fmaf_rd(-0.51F, __log2f(vecnrm), log2M));
+    return min(__float2int_rd(log2M - 1.0f), k) - ilogbf(amax);
 }
 
 template <typename T>
-__global__ void scalingA_kernel(const size_t k,                   // size(A,2)
-                                const size_t incA8i,              // lda8i * m
-                                const unsigned num_moduli,        // #moduli
+__global__ void compute_sftA_kernel(const size_t k,               // size(A,2)
                                 const T *const __restrict__ A,    // input (lda * n)
                                 const size_t lda,                 // leading dimension
-                                int8_t *const __restrict__ A8i,   // output (lda8i * m)
-                                const size_t lda8i,               // leading dimension
                                 int16_t *const __restrict__ sftA, // exponent of shift values
                                 const float log2M)                // log2(M-1)/2 - 1.5
 {
@@ -540,6 +537,21 @@ __global__ void scalingA_kernel(const size_t k,                   // size(A,2)
     if (threadIdx.x == 0) {
         sftA[row_idx] = -sft;
     }
+}
+
+template <typename T>
+__global__ void scalingA_kernel(const size_t k,                         // size(A,2)
+                                const size_t incA8i,                    // lda8i * m
+                                const unsigned num_moduli,              // #moduli
+                                const T *const __restrict__ A,          // input (lda * n)
+                                const size_t lda,                       // leading dimension
+                                int8_t *const __restrict__ A8i,         // output (lda8i * m)
+                                const size_t lda8i,                     // leading dimension
+                                const int16_t *const __restrict__ sftA) // exponent of shift values
+{
+    const auto row_idx             = blockIdx.x;
+    const T *const __restrict__ in = A + row_idx;
+    const int sft = -sftA[row_idx];
 
     int8_t *const __restrict__ out = A8i + row_idx * lda8i;
 
@@ -675,16 +687,20 @@ __inline__ void scaling(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLA
                         int16_t *const sftB,          // exponent of shift values for cols of B
                         const unsigned table_idx)     //
 {
-    const float log2M = (k < 64) ? (oz2_table::vecnorm::log2M[table_idx] - 3) : oz2_table::vecnorm::log2M[table_idx]; // fld(log2(M-1)/2 - 1.5)
+    const float log2M = oz2_table::vecnorm::log2M[table_idx]; // fld(log2(M-1)/2 - 1.5)
     if (op_A == GPUBLAS_OP_N) {
-        scalingA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
+        compute_sftA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, A, lda, sftA, log2M);
+        gpuDeviceSynchronize();
+        scalingA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA);
     } else {
         scalingB_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
     if (op_B == GPUBLAS_OP_N) {
         scalingB_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     } else {
-        scalingA_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
+        compute_sftA_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, B, ldb, sftB, log2M);
+        gpuDeviceSynchronize();
+        scalingA_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB);
     }
 }
 
