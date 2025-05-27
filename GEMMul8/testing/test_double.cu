@@ -87,7 +87,7 @@ void accuracy_check(std::string &deviceName, std::string &dateTime) {
     const size_t k_max          = *max_element(begin(k_list), end(k_list));
     const size_t num_moduli_max = *max_element(begin(num_moduli_list), end(num_moduli_list));
     double *work_cpu            = new double[m * n * 3];
-    size_t worksize             = gemmul8::workSize(m, n, k_max, num_moduli_max);
+    size_t worksize             = gemmul8::workSize(m, n, k_max, num_moduli_max, GPUBLAS_OP_N, GPUBLAS_OP_N, sizeof(double), sizeof(double));
     void *work_gpu;
     gpuMalloc(&work_gpu, (m * k_max + k_max * n + m * n * 2) * sizeof(double));
     gpuDeviceSynchronize();
@@ -241,7 +241,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
     const size_t n_max          = *max_element(begin(n_list), end(n_list));
     const size_t num_moduli_max = *max_element(begin(num_moduli_list), end(num_moduli_list));
     double *work_cpu            = new double[n_max * n_max * 3];
-    size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max);
+    size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max, GPUBLAS_OP_N, GPUBLAS_OP_N, sizeof(double), sizeof(double));
     void *work_gpu;
     gpuMalloc(&work_gpu, n_max * n_max * sizeof(double) * ((num_moduli_max >= 5) ? 3 : 4));
     gpuDeviceSynchronize();
@@ -522,7 +522,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
     const size_t n_max          = *max_element(begin(n_list), end(n_list));
     const size_t num_moduli_max = *max_element(begin(num_moduli_list), end(num_moduli_list));
     double *work_cpu            = new double[n_max * n_max * 3];
-    size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max);
+    size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max, GPUBLAS_OP_N, GPUBLAS_OP_N, sizeof(double), sizeof(double));
     void *work_gpu;
     gpuMalloc(&work_gpu, n_max * n_max * 5 * sizeof(double));
     gpuDeviceSynchronize();

@@ -1,6 +1,8 @@
 #pragma once
 #include "common.hpp"
 #include "table.hpp"
+#define TILE_DIM 32
+#define NY (TILE_DIM / 4)
 
 namespace oz2_util {
 
@@ -205,8 +207,51 @@ template <> __device__ int8_t mod_8i<float>(float a, unsigned j) {
     return static_cast<int8_t>(tmp);
 }
 
+template <typename T>
+__global__ void transpose_kernel(const size_t m,                         // size(A,1)
+                                const size_t k,                         // size(A,2)
+                                const T *const __restrict__ A,          // input (lda * n)
+                                const size_t lda,                       // leading dimension
+                                T *const __restrict__ A_trans)          // output (k * m)
+{
+    __shared__ T tile[TILE_DIM][TILE_DIM+1];
+    int x = blockIdx.x * TILE_DIM + threadIdx.x;
+    int y = blockIdx.y * TILE_DIM + threadIdx.y;
+
+    if (x < m) {
+#pragma unroll
+        for (int t = 0; t < TILE_DIM; t += NY)
+            if (y + t < k)
+                tile[threadIdx.y + t][threadIdx.x] = A[(y + t) * lda + x];
+    }
+
+    __syncthreads();
+
+    int nx = blockIdx.y * TILE_DIM + threadIdx.x;
+    int ny = blockIdx.x * TILE_DIM + threadIdx.y;
+    if (nx < k) {
+#pragma unroll
+        for (int t = 0; t < TILE_DIM; t += NY)
+            if (ny + t < m)
+                A_trans[(ny + t) * k + nx] = tile[threadIdx.x][threadIdx.y + t];
+    }
+}
 
 } // namespace
+
+template <typename T>
+void transpose(const size_t m,   // size(A,1)
+               const size_t k,   // size(A,2)
+               const T *const A, // input (lda * n)
+               const size_t lda, // leading dimension
+               T *const A_trans) // output (k * m)
+{
+
+    dim3 grid((m + TILE_DIM-1) / TILE_DIM, (k + TILE_DIM-1) / TILE_DIM);
+    dim3 threads(TILE_DIM, NY);
+    oz2_util::transpose_kernel<<<grid, threads>>>(m, k, A, lda, A_trans);
+    gpuDeviceSynchronize();
+}
 
 namespace int8tc {
 
@@ -522,11 +567,15 @@ template <> __forceinline__ __device__ int compute_sft<float>(float amax, float 
 }
 
 template <typename T>
-__global__ void compute_sftA_kernel(const size_t k,               // size(A,2)
+__global__ void scalingA_kernel(const size_t k,                   // size(A,2)
+                                const size_t incA8i,              // lda8i * m
+                                const unsigned num_moduli,        // #moduli
                                 const T *const __restrict__ A,    // input (lda * n)
                                 const size_t lda,                 // leading dimension
+                                int8_t *const __restrict__ A8i,   // output (lda8i * m)
+                                const size_t lda8i,               // leading dimension
                                 int16_t *const __restrict__ sftA, // exponent of shift values
-                                const float log2M)                // log2(M-1)/2 - 1.5
+                                const float log2M )               // log2(M-1)/2 - 1.5
 {
     __shared__ T smem[64];
     const auto row_idx             = blockIdx.x;
@@ -537,21 +586,6 @@ __global__ void compute_sftA_kernel(const size_t k,               // size(A,2)
     if (threadIdx.x == 0) {
         sftA[row_idx] = -sft;
     }
-}
-
-template <typename T>
-__global__ void scalingA_kernel(const size_t k,                         // size(A,2)
-                                const size_t incA8i,                    // lda8i * m
-                                const unsigned num_moduli,              // #moduli
-                                const T *const __restrict__ A,          // input (lda * n)
-                                const size_t lda,                       // leading dimension
-                                int8_t *const __restrict__ A8i,         // output (lda8i * m)
-                                const size_t lda8i,                     // leading dimension
-                                const int16_t *const __restrict__ sftA) // exponent of shift values
-{
-    const auto row_idx             = blockIdx.x;
-    const T *const __restrict__ in = A + row_idx;
-    const int sft = -sftA[row_idx];
 
     int8_t *const __restrict__ out = A8i + row_idx * lda8i;
 
@@ -689,18 +723,14 @@ __inline__ void scaling(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLA
 {
     const float log2M = oz2_table::vecnorm::log2M[table_idx]; // fld(log2(M-1)/2 - 1.5)
     if (op_A == GPUBLAS_OP_N) {
-        compute_sftA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, A, lda, sftA, log2M);
-        gpuDeviceSynchronize();
-        scalingA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA);
+        scalingA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     } else {
         scalingB_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
     if (op_B == GPUBLAS_OP_N) {
         scalingB_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     } else {
-        compute_sftA_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, B, ldb, sftB, log2M);
-        gpuDeviceSynchronize();
-        scalingA_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB);
+        scalingA_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     }
 }
 
