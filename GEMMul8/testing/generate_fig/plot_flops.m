@@ -7,22 +7,22 @@ if nargin == 0
 end
 
 %% files
-fileList_f = dir("oz2_results_f_time_NVIDIA_*");
+fileList_f = dir("oz2_results_f_time_*");
 filename_f = strings(length(fileList_f),1);
 for i=1:length(fileList_f)
     filename_f(i) = string(fileList_f(i).name);
 end
-fileList_d = dir("oz2_results_d_time_NVIDIA_*");
+fileList_d = dir("oz2_results_d_time_*");
 filename_d = strings(length(fileList_d),1);
 for i=1:length(fileList_d)
     filename_d(i) = string(fileList_d(i).name);
 end
-fileList_dfd = dir("oz2_results_dfd_time_NVIDIA_*");
+fileList_dfd = dir("oz2_results_dfd_time_*");
 filename_dfd = strings(length(fileList_dfd),1);
 for i=1:length(fileList_dfd)
     filename_dfd(i) = string(fileList_dfd(i).name);
 end
-fileList_dff = dir("oz2_results_dff_time_NVIDIA_*");
+fileList_dff = dir("oz2_results_dff_time_*");
 filename_dff = strings(length(fileList_dff),1);
 for i=1:length(fileList_dff)
     filename_dff(i) = string(fileList_dff(i).name);
@@ -57,7 +57,9 @@ for fn = 1:length(filename_f)
         OS2_accu = tflops(n == n_list(ni) & contains(func,"OS2-accu"));
         nexttile; hold on; grid on;
         plot(xx, SGEMM*ones(size(xx)), mark(1,1), 'DisplayName', "SGEMM", 'LineWidth',1);
-        plot(xx, SGEMM_TF*ones(size(xx)), mark(5,1), 'DisplayName', "SGEMM-TF32", 'LineWidth',1);
+        if ~isempty(SGEMM_TF)
+            plot(xx, SGEMM_TF*ones(size(xx)), mark(5,1), 'DisplayName', "SGEMM-TF32", 'LineWidth',1);
+        end
         if ~isempty(FP16TCEC)
             plot(xx, FP16TCEC*ones(size(xx)), mark(2,2), 'DisplayName', "cuMpSGEMM", 'LineWidth',1);
         end
@@ -161,7 +163,7 @@ for fn = 1:length(filename_d)
     end
 end
 
-%% double-single -> double
+%% f64-f32 -> f64
 for fn = 1:length(filename_dfd)
     filename = filename_dfd(fn);
     opts = detectImportOptions(filename);
@@ -229,7 +231,7 @@ for fn = 1:length(filename_dfd)
     end
 end
 
-%% double-single -> single
+%% f64-f32 -> f32
 for fn = 1:length(filename_dff)
     filename = filename_dff(fn);
     opts = detectImportOptions(filename);
@@ -258,7 +260,9 @@ for fn = 1:length(filename_dff)
         OS2_accu = tflops(n == n_list(ni) & contains(func,"OS2-accu"));
         nexttile; hold on; grid on;
         plot(xx, SGEMM*ones(size(xx)), mark(1,1), 'DisplayName', "SGEMM", 'LineWidth',1);
-        plot(xx, SGEMM_TF*ones(size(xx)), mark(5,1), 'DisplayName', "SGEMM-TF32", 'LineWidth',1);
+        if ~isempty(SGEMM_TF)
+            plot(xx, SGEMM_TF*ones(size(xx)), mark(5,1), 'DisplayName', "SGEMM-TF32", 'LineWidth',1);
+        end
         if ~isempty(FP16TCEC)
             plot(xx, FP16TCEC*ones(size(xx)), mark(2,2), 'DisplayName', "cuMpSGEMM", 'LineWidth',1);
         end

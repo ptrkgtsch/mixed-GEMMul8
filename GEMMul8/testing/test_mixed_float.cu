@@ -390,6 +390,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
         //--------------------
         // C := A*B by FP32 with GPUBLAS_COMPUTE_32F_FAST_TF32
         //--------------------
+#if defined(__NVCC__) || defined(_HIPBLASLT_H_) // on hipblas, HIPBLAS_COMPUTE_32F_FAST_TF32 is only supported with hipblasLT backend.
         gpuDeviceSynchronize();
         gpublasGemmEx(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, GPU_R_32F, m, devBf, GPU_R_32F, k, &betaf, devCf, GPU_R_32F, m, GPUBLAS_COMPUTE_32F_FAST_TF32, GPUBLAS_GEMM_DEFAULT);
         gpuDeviceSynchronize();
@@ -414,6 +415,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
         std::cout << phi << "," << m << "," << n << "," << k << "," << "SGEMM-TF32" << ",";
         std::cout << std::scientific << maxerr << "," << mederr << "," << 2.0 * m * n * k / time * 1.e-12 << "," << time << ","
                   << "," << "," << "," << "," << std::endl;
+#endif
 
 #if defined(cuMpSGEMM_FLAG) && defined(__NVCC__)
         cumpsgemm::handle_t cuMpSGEMM_handle;
@@ -689,6 +691,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
         //--------------------
         // C := A*B by FP32 with GPUBLAS_COMPUTE_32F_FAST_TF32
         //--------------------
+#if defined(__NVCC__) || defined(_HIPBLASLT_H_) // on hipblas, HIPBLAS_COMPUTE_32F_FAST_TF32 is only supported with hipblasLT backend.
         res = getWatt::getWatt(
             [&]() {
                 gpublasGemmEx(handle,
@@ -723,6 +726,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
         outFile << std::scientific << maxerr << "," << mederr << "," << res[0] << "," << res[1] * 1.e-9 << "," << std::endl;
         std::cout << phi << "," << m << "," << n << "," << k << "," << "SGEMM-TF32" << ",";
         std::cout << std::scientific << maxerr << "," << mederr << "," << res[0] << "," << res[1] * 1.e-9 << "," << std::endl;
+#endif
 
 #if defined(cuMpSGEMM_FLAG) && defined(__NVCC__)
         cumpsgemm::handle_t cuMpSGEMM_handle;
