@@ -54,7 +54,7 @@ include_directories(${INCDIR})
 if (${GPU_RUNTIME} MATCHES "CUDA")
     set(LIBS -lnvidia-ml -lcublas -lcudart -lcuda -L../lib -lgemmul8)
 else ()
-    set(LIBS -lamdhip64 -lhipblas -L../lib -lgemmul8)
+    set(LIBS -lamd_smi -lamdhip64 -lhipblas -L../lib -lgemmul8)
 endif()
 
 if (${GPU_RUNTIME} MATCHES "CUDA")
@@ -87,6 +87,7 @@ set(TEST_SOURCES
     test_float.cu
     test_mixed_double.cu
     test_mixed_float.cu
+    profile_one_call.cu
 )
 
 foreach(TEST_SOURCE ${TEST_SOURCES})

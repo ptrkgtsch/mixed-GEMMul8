@@ -1,8 +1,6 @@
 #include "../include/gemmul8.hpp"
 #include "eval.hpp"
-#if defined(__NVCC__)
 #include "getWatt.hpp"
-#endif
 #include "make_matrix.hpp"
 #include <algorithm>
 #include <chrono>
@@ -247,7 +245,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
             << "relerr_max,relerr_med,"
             << "TFLOPS,"
             << "total_time [sec],"
-            << "conv_32f_2_8i,"
+            << "conv_64&32f_2_8i,"
             << "gpublasGemmEx,"
             << "conv_32i_2_8u,"
             << "inverse_scaling,"
@@ -257,7 +255,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
               << "relerr_max,relerr_med,"
               << "TFLOPS,"
               << "total_time [sec],"
-              << "conv_32f_2_8i,"
+              << "conv_64&32f_2_8i,"
               << "gpublasGemmEx,"
               << "conv_32i_2_8u,"
               << "inverse_scaling,"
@@ -528,7 +526,6 @@ void time_check(std::string &deviceName, std::string &dateTime) {
     outFile.close();
 }
 
-#if defined(__NVCC__)
 void watt_check(std::string &deviceName, std::string &dateTime) {
     std::string fileName = "oz2_results_dff_watt_" + deviceName + "_" + dateTime + ".csv";
     std::ofstream outFile(fileName);
@@ -811,7 +808,6 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
     gpublasDestroy(handle);
     outFile.close();
 }
-#endif // defined(__NVCC__)
 
 int main(int argc, char **argv) {
     std::string deviceName = getDeviceName();
@@ -839,10 +835,8 @@ int main(int argc, char **argv) {
         accuracy_check(deviceName, dateTime);
     if (run_flops)
         time_check(deviceName, dateTime);
-#if defined(__NVCC__)
     if (run_watt)
         watt_check(deviceName, dateTime);
-#endif
 
     return 0;
 }

@@ -3,13 +3,19 @@
 #include <ctime>
 #include <fstream>
 #include <iostream>
+#if defined(__NVCC__)
 #include <nvml.h>
+#elif defined(__HIPCC__)
+#include <amd_smi/amdsmi.h>
+#include <functional>
+#endif
 #include <sstream>
 #include <thread>
 #include <vector>
 
 namespace getWatt {
 
+#if defined(__NVCC__)
 double get_current_power(const unsigned gpu_id) {
     nvmlDevice_t device;
     nvmlDeviceGetHandleByIndex(gpu_id, &device);
@@ -17,6 +23,25 @@ double get_current_power(const unsigned gpu_id) {
     nvmlDeviceGetPowerUsage(device, &power);
     return power / 1000.0;
 }
+#elif defined(__HIPCC__)
+#define CHK_AMDSMI_RET(RET)                                                    \
+    {                                                                          \
+        if (RET != AMDSMI_STATUS_SUCCESS) {                                    \
+            const char *err_str;                                               \
+            std::cout << "AMDSMI call returned " << RET << " at line "         \
+                      << __LINE__ << std::endl;                                \
+            amdsmi_status_code_to_string(RET, &err_str);                       \
+            std::cout << err_str << std::endl;                                 \
+            return profiling_result;                                           \
+        }                                                                      \
+    }
+
+double get_current_power(amdsmi_processor_handle handle) {
+    amdsmi_power_info_t info;
+    amdsmi_get_power_info(handle, &info);
+    return static_cast<double>(info.average_socket_power);
+}
+#endif
 
 struct PowerProfile {
     double power;
@@ -33,6 +58,9 @@ double get_elapsed_time(const std::vector<PowerProfile> &profiling_data_list) {
 std::vector<PowerProfile> getGpuPowerUsage(const std::function<void(void)> func, const std::time_t interval) {
     std::vector<PowerProfile> profiling_result;
 
+    int gpu_id = 0;
+
+#if defined(__NVCC__)
     nvmlReturn_t result;
 
     result = nvmlInit();
@@ -45,8 +73,37 @@ std::vector<PowerProfile> getGpuPowerUsage(const std::function<void(void)> func,
     if (result != NVML_SUCCESS) {
         std::cerr << "Failed to device count: " << nvmlErrorString(result) << std::endl;
     }
+#elif defined(__HIPCC__)
+    amdsmi_status_t ret;
+    ret = amdsmi_init(AMDSMI_INIT_AMD_GPUS);
+    CHK_AMDSMI_RET(ret)
 
-    int gpu_id = 0;
+    // Get the socket count available for the system.
+    uint32_t socket_count = 0;
+    ret = amdsmi_get_socket_handles(&socket_count, nullptr);
+    CHK_AMDSMI_RET(ret)
+
+    // Allocate the memory for the sockets
+    std::vector<amdsmi_socket_handle> sockets(socket_count);
+    // Get the sockets of the system
+    ret = amdsmi_get_socket_handles(&socket_count, &sockets[0]);
+    CHK_AMDSMI_RET(ret)
+
+    int i=0;
+    // Get the device count available for the socket.
+    uint32_t device_count = 0;
+    ret = amdsmi_get_processor_handles(sockets[i], &device_count, nullptr);
+    CHK_AMDSMI_RET(ret)
+
+    // Allocate the memory for the device handlers on the socket
+    std::vector<amdsmi_processor_handle> processor_handles(device_count);
+    // Get all devices of the socket
+    ret = amdsmi_get_processor_handles(sockets[i],
+                                    &device_count, &processor_handles[0]);
+    CHK_AMDSMI_RET(ret)
+
+    amdsmi_processor_handle gpu_handle = processor_handles[gpu_id];
+#endif
 
     unsigned count = 0;
 
@@ -62,7 +119,11 @@ std::vector<PowerProfile> getGpuPowerUsage(const std::function<void(void)> func,
         const auto end_clock    = std::chrono::high_resolution_clock::now();
         const auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count();
 
+#if defined(__NVCC__)
         const auto power = get_current_power(gpu_id);
+#elif defined(__HIPCC__)
+        const auto power = get_current_power(gpu_handle);
+#endif
 
         const auto end_clock_1    = std::chrono::high_resolution_clock::now();
         const auto elapsed_time_1 = std::chrono::duration_cast<std::chrono::milliseconds>(end_clock_1 - start_clock).count();
@@ -76,7 +137,11 @@ std::vector<PowerProfile> getGpuPowerUsage(const std::function<void(void)> func,
 
     thread.join();
 
+#if defined(__NVCC__)
     nvmlShutdown();
+#elif defined(__HIPCC__)
+    amdsmi_shut_down();
+#endif
 
     return profiling_result;
 }
