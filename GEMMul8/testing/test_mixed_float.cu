@@ -561,7 +561,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
     float *workf_cpu            = new float[n_max * n_max];
     size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max, GPUBLAS_OP_N, GPUBLAS_OP_N, sizeof(double), sizeof(float));
     void *work_gpu;
-    gpuMalloc(&work_gpu, n_max * n_max * 3 * (sizeof(double) + sizeof(float)));
+    gpuMalloc(&work_gpu, n_max * n_max * 3 * sizeof(float) + n_max * n_max * sizeof(double));
     gpuDeviceSynchronize();
     void *work_gemm;
     gpuMalloc(&work_gemm, worksize);
