@@ -103,7 +103,7 @@ void accuracy_check(std::string &deviceName, std::string &dateTime) {
     const size_t num_moduli_max = *max_element(begin(num_moduli_list), end(num_moduli_list));
     double *workd_cpu           = new double[m * n];
     float *workf_cpu            = new float[m * n];
-    size_t worksize             = gemmul8::workSize(m, n, k_max, num_moduli_max, GPUBLAS_OP_N, GPUBLAS_OP_N, sizeof(double), sizeof(float));
+    size_t worksize             = gemmul8::workSize(m, n, k_max, num_moduli_max);
     void *work_gpu;
     gpuMalloc(&work_gpu, (m * k_max + k_max * n + m * n) * (sizeof(double) + sizeof(float)));
     gpuDeviceSynchronize();
@@ -279,7 +279,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
     const size_t num_moduli_max = *max_element(begin(num_moduli_list), end(num_moduli_list));
     double *workd_cpu           = new double[n_max * n_max];
     float *workf_cpu            = new float[n_max * n_max];
-    size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max, GPUBLAS_OP_N, GPUBLAS_OP_N, sizeof(double), sizeof(float));
+    size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max);
     void *work_gpu;
     gpuMalloc(&work_gpu, n_max * n_max * 3 * sizeof(float) + n_max * n_max * sizeof(double));
     gpuDeviceSynchronize();
@@ -561,7 +561,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
     const size_t num_moduli_max = *max_element(begin(num_moduli_list), end(num_moduli_list));
     double *workd_cpu           = new double[n_max * n_max];
     float *workf_cpu            = new float[n_max * n_max];
-    size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max, GPUBLAS_OP_N, GPUBLAS_OP_N, sizeof(double), sizeof(float));
+    size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max);
     void *work_gpu;
     gpuMalloc(&work_gpu, n_max * n_max * 3 * sizeof(float) + n_max * n_max * sizeof(double));
     gpuDeviceSynchronize();

@@ -4,9 +4,6 @@
 #include "inverse_scaling.hpp"
 #include "scaling.hpp"
 #include "table.hpp"
-#if defined(__HIPCC__)
-#define DO_TRANSLATE 1
-#endif
 
 namespace {
 void timing_start(std::chrono::system_clock::time_point &timetmp) {
@@ -29,34 +26,26 @@ namespace gemmul8 {
 size_t workSize(const size_t m,            // size(A,1) & size(C,1) <= 2^17
                 const size_t n,            // size(B,2) & size(C,2) <= 2^17
                 const size_t k,            // size(A,2) & size(B,1) <= 2^17
-                const unsigned num_moduli, // 2 <= num_moduli <= 20
-                const gpublasOperation_t op_A, // operation used in GEMM, not needed for NVIDIA
-                const gpublasOperation_t op_B, // operation used in GEMM, not needed for NVIDIA
-                const size_t sizeof_A,     // size in bytes of elements of B, not needed for NVIDIA
-                const size_t sizeof_B)     // size in bytes of elements of A, not needed for NVIDIA
+                const unsigned num_moduli) // 2 <= num_moduli <= 20
 {
     const size_t lda8i     = ((k + 15) >> 4) << 4;
     const size_t ldb8i     = lda8i;
     const size_t sizeA     = lda8i * m;
     const size_t sizeB     = ldb8i * n;
     const size_t sizeC     = ((m * n + 15) >> 4) << 4;
+#if defined(__HIPCC__)
+    const size_t sizeC32i  = m % 1024 == 0 ? (((m+1) * n + 15) >> 4) << 4 : sizeC;
+#else
+    const size_t sizeC32i  = sizeC;
+#endif
     const size_t size_vecA = (((m + 15) >> 4) << 4); // multiple of 16
     const size_t size_vecB = (((n + 15) >> 4) << 4); // multiple of 16
 
     size_t total_size = 0;
     total_size += sizeof(int8_t) * (sizeA + sizeB) * num_moduli;
     total_size += sizeof(uint8_t) * sizeC * num_moduli;
-    total_size += sizeof(int32_t) * sizeC;
+    total_size += sizeof(int32_t) * sizeC32i;
     total_size += sizeof(int16_t) * (size_vecA + size_vecB);
-
-#ifdef DO_TRANSLATE
-    if (op_A == GPUBLAS_OP_N) {
-        total_size += sizeof_A * m * k;
-    }
-    if (op_B == GPUBLAS_OP_T) {
-        total_size += sizeof_B * k * n;
-    }
-#endif
 
     return total_size;
 }
@@ -94,10 +83,12 @@ std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
     const size_t sizeA       = lda8i * m;
     const size_t sizeB       = ldb8i * n;
     const size_t sizeC       = ((m * n + 15) >> 4) << 4; // multiple of 16
-    const size_t size_vecA   = (((m + 15) >> 4) << 4);   // multiple of 16
-#ifdef DO_TRANSLATE
-    const size_t size_vecB   = (((n + 15) >> 4) << 4);
+#if defined(__HIPCC__)
+    const size_t sizeC32i    = m % 1024 == 0 ? (((m+1) * n + 15) >> 4) << 4 : sizeC;
+#else
+    const size_t sizeC32i    = sizeC;
 #endif
+    const size_t size_vecA   = (((m + 15) >> 4) << 4);   // multiple of 16
     const unsigned table_idx = num_moduli - 2;
     const unsigned numM      = oz2_table::numM[table_idx]; // numM <= 2
     const bool is_numM_1     = numM == 1;
@@ -131,14 +122,8 @@ std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
     int8_t *B8i   = A8i + sizeA * num_moduli;                              // ldb8i*n*sizeod(int8_t)*num_moduli
     uint8_t *C8u  = reinterpret_cast<uint8_t *>(B8i + sizeB * num_moduli); // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
     int32_t *C32i = reinterpret_cast<int32_t *>(C8u + sizeC * num_moduli); // (m*n+15)/16*16*sizeof(int32_t)
-    int16_t *sftA = reinterpret_cast<int16_t *>(C32i + sizeC);             // (m+15)/16*16*sizeof(int16_t)
+    int16_t *sftA = reinterpret_cast<int16_t *>(C32i + sizeC32i);          // (m+15)/16*16*sizeof(int16_t)
     int16_t *sftB = sftA + size_vecA;                                      // (n+15)/16*16*sizeof(int16_t)
-#ifdef DO_TRANSLATE
-    double *A_trans = reinterpret_cast<double *>(sftB + size_vecB);
-    double *B_trans = A_trans;
-    if (op_A == GPUBLAS_OP_N && op_B == GPUBLAS_OP_T)
-        B_trans = A_trans + m * k;
-#endif
 
     if (is_numM_1) {
         gpuMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_1[table_idx][0], num_moduli * sizeof(double));
@@ -156,33 +141,11 @@ std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
     // B8i := B64f - round(B64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
     //------------------------------
     timing_start(timetmp);
-#ifdef DO_TRANSLATE
-    const double* A_use = A;
-    const double* B_use = B;
-    size_t lda_use = lda;
-    size_t ldb_use = ldb;
-    if (op_A == GPUBLAS_OP_N) {
-        oz2_util::transpose<double>(m, k, A, lda, A_trans);
-        A_use = A_trans;
-        lda_use = k;
-    }
-    if (op_B == GPUBLAS_OP_T) {
-        oz2_util::transpose<double>(m, k, B, ldb, B_trans);
-        B_use = B_trans;
-        ldb_use = n;
-    }
-    if (fastmode) {
-        oz2_util::vecnorm::scaling<double>(GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, k, num_moduli, A_use, lda_use, B_use, ldb_use, A8i, lda8i, sftA, B8i, ldb8i, sftB, table_idx);
-    } else {
-        oz2_util::int8tc::scaling<double>(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, k, num_moduli, A_use, lda_use, B_use, ldb_use, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
-    }
-#else
     if (fastmode) {
         oz2_util::vecnorm::scaling<double>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, table_idx);
     } else {
         oz2_util::int8tc::scaling<double>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
     }
-#endif
     timing_stop(timetmp, timer[0]);
 
     for (unsigned i = 0; i < num_moduli; ++i) {
@@ -253,10 +216,12 @@ std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
     const size_t sizeA       = lda8i * m;
     const size_t sizeB       = ldb8i * n;
     const size_t sizeC       = ((m * n + 15) >> 4) << 4; // multiple of 16
-    const size_t size_vecA   = (((m + 15) >> 4) << 4);
-#ifdef DO_TRANSLATE
-    const size_t size_vecB   = (((n + 15) >> 4) << 4);
+#if defined(__HIPCC__)
+    const size_t sizeC32i    = m % 1024 == 0 ? (((m+1) * n + 15) >> 4) << 4 : sizeC;
+#else
+    const size_t sizeC32i    = sizeC;
 #endif
+    const size_t size_vecA   = (((m + 15) >> 4) << 4);
     const unsigned table_idx = num_moduli - 2;
     constexpr int32_t one    = 1;
     constexpr int32_t zero   = 0;
@@ -288,14 +253,8 @@ std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
     int8_t *B8i   = A8i + sizeA * num_moduli;                              // ldb8i*n*sizeod(int8_t)*num_moduli
     uint8_t *C8u  = reinterpret_cast<uint8_t *>(B8i + sizeB * num_moduli); // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
     int32_t *C32i = reinterpret_cast<int32_t *>(C8u + sizeC * num_moduli); // (m*n+15)/16*16*sizeof(int32_t)
-    int16_t *sftA = reinterpret_cast<int16_t *>(C32i + sizeC);             // (m+15)/16*16*sizeof(int16_t)
+    int16_t *sftA = reinterpret_cast<int16_t *>(C32i + sizeC32i);          // (m+15)/16*16*sizeof(int16_t)
     int16_t *sftB = sftA + size_vecA;                                      // (n+15)/16*16*sizeof(int16_t)
-#ifdef DO_TRANSLATE
-    float *A_trans = reinterpret_cast<float *>(sftB + size_vecB);
-    float *B_trans = A_trans;
-    if (op_A == GPUBLAS_OP_N && op_B == GPUBLAS_OP_T)
-        B_trans = A_trans + m * k;
-#endif
 
     gpuMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_1[table_idx][0], num_moduli * sizeof(double));
     gpuMemcpyToSymbol(oz2_table::modulif_dev, oz2_table::modulif, num_moduli * sizeof(oz2_table::tab_t<float>));
@@ -309,33 +268,11 @@ std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
     // B8i := mod(B64f, modulus[i]) - 128 (-128 <= A8i <= 127)
     //------------------------------
     timing_start(timetmp);
-#ifdef DO_TRANSLATE
-    const float* A_use = A;
-    const float* B_use = B;
-    size_t lda_use = lda;
-    size_t ldb_use = ldb;
-    if (op_A == GPUBLAS_OP_N) {
-        oz2_util::transpose<float>(m, k, A, lda, A_trans);
-        A_use = A_trans;
-        lda_use = k;
-    }
-    if (op_B == GPUBLAS_OP_T) {
-        oz2_util::transpose<float>(m, k, B, ldb, B_trans);
-        B_use = B_trans;
-        ldb_use = n;
-    }
-    if (fastmode) {
-        oz2_util::vecnorm::scaling<float>(GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, k, num_moduli, A_use, lda_use, B_use, ldb_use, A8i, lda8i, sftA, B8i, ldb8i, sftB, table_idx);
-    } else {
-        oz2_util::int8tc::scaling<float>(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, k, num_moduli, A_use, lda_use, B_use, ldb_use, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
-    }
-#else
     if (fastmode) {
         oz2_util::vecnorm::scaling<float>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, table_idx);
     } else {
         oz2_util::int8tc::scaling<float>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
     }
-#endif
     timing_stop(timetmp, timer[0]);
 
     for (unsigned i = 0; i < num_moduli; ++i) {
@@ -406,10 +343,12 @@ std::vector<double> gemm_mixed(gpublasHandle_t handle,          // handle
     const size_t sizeA       = lda8i * m;
     const size_t sizeB       = ldb8i * n;
     const size_t sizeC       = ((m * n + 15) >> 4) << 4; // multiple of 16
-    const size_t size_vecA   = (((m + 15) >> 4) << 4);   // multiple of 16
-#ifdef DO_TRANSLATE
-    const size_t size_vecB   = (((n + 15) >> 4) << 4);
+#if defined(__HIPCC__)
+    const size_t sizeC32i    = m % 1024 == 0 ? (((m+1) * n + 15) >> 4) << 4 : sizeC;
+#else
+    const size_t sizeC32i    = sizeC;
 #endif
+    const size_t size_vecA   = (((m + 15) >> 4) << 4);   // multiple of 16
     const unsigned table_idx = num_moduli - 2;
     const unsigned numM      = oz2_table::numM[table_idx]; // numM <= 2
     const bool is_numM_1     = numM == 1;
@@ -443,14 +382,8 @@ std::vector<double> gemm_mixed(gpublasHandle_t handle,          // handle
     int8_t *B8i   = A8i + sizeA * num_moduli;                              // ldb8i*n*sizeod(int8_t)*num_moduli
     uint8_t *C8u  = reinterpret_cast<uint8_t *>(B8i + sizeB * num_moduli); // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
     int32_t *C32i = reinterpret_cast<int32_t *>(C8u + sizeC * num_moduli); // (m*n+15)/16*16*sizeof(int32_t)
-    int16_t *sftA = reinterpret_cast<int16_t *>(C32i + sizeC);             // (m+15)/16*16*sizeof(int16_t)
+    int16_t *sftA = reinterpret_cast<int16_t *>(C32i + sizeC32i);          // (m+15)/16*16*sizeof(int16_t)
     int16_t *sftB = sftA + size_vecA;                                      // (n+15)/16*16*sizeof(int16_t)
-#ifdef DO_TRANSLATE
-    TA *A_trans = reinterpret_cast<TA *>(sftB + size_vecB);
-    TB *B_trans = reinterpret_cast<TB *>(A_trans);
-    if (op_A == GPUBLAS_OP_N && op_B == GPUBLAS_OP_T)
-        B_trans = reinterpret_cast<TB *>(A_trans + m * k);
-#endif
 
     if (is_numM_1) {
         gpuMemcpyToSymbol(oz2_table::NMi_dev, &oz2_table::NMi_1[table_idx][0], num_moduli * sizeof(double));
@@ -469,33 +402,11 @@ std::vector<double> gemm_mixed(gpublasHandle_t handle,          // handle
     // B8i := B64f - round(B64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
     //------------------------------
     timing_start(timetmp);
-#ifdef DO_TRANSLATE
-    const TA* A_use = A;
-    const TB* B_use = B;
-    size_t lda_use = lda;
-    size_t ldb_use = ldb;
-    if (op_A == GPUBLAS_OP_N) {
-        oz2_util::transpose<TA>(m, k, A, lda, A_trans);
-        A_use = A_trans;
-        lda_use = k;
-    }
-    if (op_B == GPUBLAS_OP_T) {
-        oz2_util::transpose<TB>(m, k, B, ldb, B_trans);
-        B_use = B_trans;
-        ldb_use = n;
-    }
-    if (fastmode) {
-        oz2_util::vecnorm::scaling<TA, TB>(GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, k, num_moduli, A_use, lda_use, B_use, ldb_use, A8i, lda8i, sftA, B8i, ldb8i, sftB, table_idx);
-    } else {
-        oz2_util::int8tc::scaling<TA, TB>(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, k, num_moduli, A_use, lda_use, B_use, ldb_use, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
-    }
-#else
     if (fastmode) {
         oz2_util::vecnorm::scaling<TA, TB>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, table_idx);
     } else {
         oz2_util::int8tc::scaling<TA, TB>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
     }
-#endif
     timing_stop(timetmp, timer[0]);
 
     for (unsigned i = 0; i < num_moduli; ++i) {

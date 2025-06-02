@@ -11,11 +11,7 @@ namespace gemmul8 {
 size_t workSize(const size_t m,             // size(A,1) & size(C,1)
                 const size_t n,             // size(B,2) & size(C,2)
                 const size_t k,             // size(A,2) & size(B,1) <= 2^17
-                const unsigned num_moduli,  // #moduli, 2 <= num_moduli <= (DGEMM emulation) ? 20 : 19
-                const gpublasOperation_t op_A = GPUBLAS_OP_N, // operation used in GEMM, not needed for NVIDIA
-                const gpublasOperation_t op_B = GPUBLAS_OP_N, // operation used in GEMM, not needed for NVIDIA
-                const size_t sizeof_A = 8,  // size in bytes of elements of A, not needed for NVIDIA
-                const size_t sizeof_B = 8); // size in bytes of elements of B, not needed for NVIDIA
+                const unsigned num_moduli); // #moduli, 2 <= num_moduli <= (DGEMM emulation) ? 20 : 19
 
 // gemm returns computation time in second of each part
 // Usage:

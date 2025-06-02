@@ -11,7 +11,7 @@ int main() {
     int m = 8192;
     int k = 8192;
     int n = 8192;
-    size_t worksize = gemmul8::workSize(m, n, k, 14, GPUBLAS_OP_N, GPUBLAS_OP_N, sizeof(float), sizeof(float));
+    size_t worksize = gemmul8::workSize(m, n, k, 14);
     void *work_gpu;
     gpuMalloc(&work_gpu, (m * k + k * n + m * n) * sizeof(float));
     gpuDeviceSynchronize();
@@ -30,7 +30,7 @@ int main() {
     for (int i = 0; i < 20; i++) {
         gpuDeviceSynchronize();
         gemmul8::gemm<float>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m,
-                             14, true, work_gemm);
+                             14, false, work_gemm);
         gpuDeviceSynchronize();
     }
 }
