@@ -2,6 +2,11 @@
 #include "eval.hpp"
 #include "make_matrix.hpp"
 #include "gpu_arch.hpp"
+#if defined(__HIPCC__)
+#define NB_ITER 20
+#else
+#define NB_ITER 1
+#endif
 
 int main() {
     gpublasHandle_t handle;
@@ -27,10 +32,10 @@ int main() {
 
     float alphaf = 1.0;
     float betaf = 0.0;
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < NB_ITER; i++) {
         gpuDeviceSynchronize();
         gemmul8::gemm<float>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m,
-                             14, false, work_gemm);
+                             14, true, work_gemm);
         gpuDeviceSynchronize();
     }
 }
