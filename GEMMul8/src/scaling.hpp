@@ -799,7 +799,7 @@ __inline__ void scaling(gpublasHandle_t handle,        // handle
     }
     if (op_B != GPUBLAS_OP_N) {
 #if defined(__HIPCC__)
-        if (lda % 1024 == 0) {
+        if (ldb % 1024 == 0) {
             stair_kernel<TB><<<k, oz2_const::threads_scaling>>>(n, B, ldb, reinterpret_cast<TB *>(B8i), ldb + 1);
             extract_A8i_cmpt_sftA_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, reinterpret_cast<TB *>(B8i), ldb + 1, sftB);
             dim3 grid((n + TILE_DIM-1) / TILE_DIM, (k + TILE_DIM-1) / TILE_DIM);
@@ -833,7 +833,7 @@ __inline__ void scaling(gpublasHandle_t handle,        // handle
     const float log2M = oz2_table::int8tc::log2M[table_idx]; // fld(log2(M-1)/2 - 0.5)
     if (op_A == GPUBLAS_OP_N) {
 #if defined(__HIPCC__)
-        if (m % 1024 == 0) {
+        if (lda % 1024 == 0) {
             scalingA_kernel_cmpt_sftA_kernel<<<m, oz2_const::threads_scaling>>>(n, C32i, ldc32i, sftA, log2M);
             dim3 grid((m + TILE_DIM-1) / TILE_DIM, (k + TILE_DIM-1) / TILE_DIM);
             dim3 threads_scalingA(TILE_DIM, NY);
@@ -849,7 +849,7 @@ __inline__ void scaling(gpublasHandle_t handle,        // handle
         scalingB_kernel<TB><<<n, oz2_const::threads_scaling>>>(m, k, ldb8i * n, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
     } else {
 #if defined(__HIPCC__)
-        if (n % 1024 == 0) {
+        if (ldb % 1024 == 0) {
             scalingBT_kernel_cmpt_sftB_kernel<<<n, oz2_const::threads_scaling>>>(m, C32i, ldc32i, sftB, log2M);
             dim3 grid((n + TILE_DIM-1) / TILE_DIM, (k + TILE_DIM-1) / TILE_DIM);
             dim3 threads_scalingA(TILE_DIM, NY);
