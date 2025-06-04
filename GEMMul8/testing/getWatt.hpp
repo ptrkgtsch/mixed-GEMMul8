@@ -39,6 +39,8 @@ double get_current_power(const unsigned gpu_id) {
 double get_current_power(amdsmi_processor_handle handle) {
     amdsmi_power_info_t info;
     amdsmi_get_power_info(handle, &info);
+    if (info.average_socket_power >= 10000)
+        return static_cast<double>(info.current_socket_power);
     return static_cast<double>(info.average_socket_power);
 }
 #endif
