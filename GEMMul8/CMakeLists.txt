@@ -14,6 +14,31 @@ if (${GPU_RUNTIME} MATCHES "HIP")
     add_compile_definitions(OCML_BASIC_ROUNDED_OPERATIONS) # for _ru and _rd modes (slow!)
     add_compile_definitions(HIP_ENABLE_WARP_SYNC_BUILTINS) # for __shfl_down_sync
     add_compile_options(-Wno-unused-result)
+
+    # Get architecture (LLVM target)
+    execute_process(
+            COMMAND amd-smi static --asic --csv
+            OUTPUT_VARIABLE AMD_SMI_OUTPUT
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
+    # Split the output into lines
+    string(REPLACE "\n" ";" OUTPUT_LINES "${AMD_SMI_OUTPUT}")
+    # Get the last line
+    list(LENGTH OUTPUT_LINES OUTPUT_LINES_COUNT)
+    math(EXPR LAST_INDEX "${OUTPUT_LINES_COUNT} - 1")
+    list(GET OUTPUT_LINES ${LAST_INDEX} LAST_LINE)
+    # Split the last line by commas
+    string(REPLACE "," ";" LAST_LINE_ENTRIES "${LAST_LINE}")
+    # Get the last entry
+    list(LENGTH LAST_LINE_ENTRIES LAST_LINE_ENTRIES_COUNT)
+    math(EXPR LAST_ENTRY_INDEX "${LAST_LINE_ENTRIES_COUNT} - 1")
+    list(GET LAST_LINE_ENTRIES ${LAST_ENTRY_INDEX} LAST_ENTRY)
+    string(REPLACE "gfx" "0x" GPU_ARCH "${LAST_ENTRY}")
+
+    # Print the last entry and set the arch
+    message(STATUS "target_graphics_version: ${LAST_ENTRY}, GPU_ARCH: ${GPU_ARCH}")
+    add_compile_definitions(GEMMul8_ARCH=${GPU_ARCH})
 elseif (${GPU_RUNTIME} MATCHES "CUDA")
     find_package(CUDA 11.0 REQUIRED)
     find_package(CUDAToolkit REQUIRED)
