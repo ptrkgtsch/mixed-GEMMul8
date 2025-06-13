@@ -88,6 +88,8 @@ set(TEST_SOURCES
     test_mixed_double.cu
     test_mixed_float.cu
     profile_one_call.cu
+    one_accuracy.cu
+    one_accuracy_complex.cu
 )
 
 foreach(TEST_SOURCE ${TEST_SOURCES})

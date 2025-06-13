@@ -5,6 +5,8 @@
 #include <omp.h>
 #include <vector>
 
+#include "gpu_arch.hpp"
+
 namespace eval {
 
 //------------------------------
@@ -353,6 +355,27 @@ void gemm_err(const size_t m,
     std::sort(C, C + sizeC);
     err1 = double(C[sizeC - 1]);
     err2 = (sizeC & 1) ? double(C[sizeC / 2]) : ((double(C[sizeC / 2]) + double(C[sizeC / 2 - 1])) * 0.5);
+}
+
+void gemm_err_C(const size_t m,
+              const size_t n,
+              gpuFloatComplex *const C,         // calculated value
+              const gpuDoubleComplex *const C1, // true value
+              double &err1,           // max
+              double &err2)           // median
+{
+    size_t sizeC = m * n;
+    std::vector<float> newC(sizeC);
+
+#pragma omp parallel for
+    for (size_t i = 0; i < sizeC; i++) {
+        double tmp = gpuCabs(gpuCsub(gpuComplexFloatToDouble(C[i]), C1[i])) / gpuCabs(C1[i]);
+        newC[i]    = float(std::fabs(tmp));
+    }
+
+    std::sort(newC.begin(), newC.end());
+    err1 = double(newC[sizeC - 1]);
+    err2 = (sizeC & 1) ? double(newC[sizeC / 2]) : ((double(newC[sizeC / 2]) + double(newC[sizeC / 2 - 1])) * 0.5);
 }
 
 } // namespace err

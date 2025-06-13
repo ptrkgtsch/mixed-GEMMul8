@@ -38,4 +38,8 @@ int main() {
                              14, true, work_gemm);
         gpuDeviceSynchronize();
     }
+
+    gpuFree(work_gpu);
+    gpuFree(work_gemm);
+    gpublasDestroy(handle);
 }

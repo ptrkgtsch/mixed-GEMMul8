@@ -13,6 +13,15 @@ size_t workSize(const size_t m,             // size(A,1) & size(C,1)
                 const size_t k,             // size(A,2) & size(B,1) <= 2^17
                 const unsigned num_moduli); // #moduli, 2 <= num_moduli <= (DGEMM emulation) ? 20 : 19
 
+// workSize returns work size required in gemm if complex matrices are given
+// Usage:
+//  void *work;
+//  cudaMalloc(&work, workSize(m,n,k,num_moduli));
+size_t workSize_C(const size_t m,             // size(A,1) & size(C,1)
+                  const size_t n,             // size(B,2) & size(C,2)
+                  const size_t k,             // size(A,2) & size(B,1) <= 2^17
+                  const unsigned num_moduli); // #moduli, 2 <= num_moduli <= (DGEMM emulation) ? 20 : 19
+
 // gemm returns computation time in second of each part
 // Usage:
 //  std::vector<double> times = gemmul8::gemm(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alpha, devA, m, devB, k, &beta, devC, m, num_moduli, fastmode, work);
@@ -150,5 +159,119 @@ std::vector<double> gemm<float, double, float>(gpublasHandle_t handle,        //
                          const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,          // false (accurate-mode) or true (fast-mode)
                          void *const work);            // workspace allocated in advance
+
+template <>
+std::vector<double> gemm<gpuFloatComplex, gpuFloatComplex, gpuFloatComplex>(gpublasHandle_t handle,        // handle
+                         const gpublasOperation_t op_A,  // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const gpublasOperation_t op_B,  // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const size_t m,                 // size(A,1) & size(C,1)
+                         const size_t n,                 // size(B,2) & size(C,2)
+                         const size_t k,                 // size(A,2) & size(B,1) <= 2^17
+                         const gpuFloatComplex *alpha,   //
+                         const gpuFloatComplex *const A, // input
+                         const size_t lda,               // leading dimension
+                         const gpuFloatComplex *const B, // input
+                         const size_t ldb,               // leading dimension
+                         const gpuFloatComplex *beta,    //
+                         gpuFloatComplex *const C,       // output A*B
+                         const size_t ldc,               // leading dimension
+                         const unsigned num_moduli,      // #moduli, 2 <= num_moduli <= 20
+                         const bool fastmode,            // false (accurate-mode) or true (fast-mode)
+                         void *const work);              // workspace allocated in advance
+
+template <>
+std::vector<double> gemm<gpuDoubleComplex, gpuDoubleComplex, gpuDoubleComplex>(gpublasHandle_t handle,        // handle
+                         const gpublasOperation_t op_A,   // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const gpublasOperation_t op_B,   // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const size_t m,                  // size(A,1) & size(C,1)
+                         const size_t n,                  // size(B,2) & size(C,2)
+                         const size_t k,                  // size(A,2) & size(B,1) <= 2^17
+                         const gpuDoubleComplex *alpha,   //
+                         const gpuDoubleComplex *const A, // input
+                         const size_t lda,                // leading dimension
+                         const gpuDoubleComplex *const B, // input
+                         const size_t ldb,                // leading dimension
+                         const gpuDoubleComplex *beta,    //
+                         gpuDoubleComplex *const C,       // output A*B
+                         const size_t ldc,                // leading dimension
+                         const unsigned num_moduli,       // #moduli, 2 <= num_moduli <= 20
+                         const bool fastmode,             // false (accurate-mode) or true (fast-mode)
+                         void *const work);               // workspace allocated in advance
+
+template <>
+std::vector<double> gemm<gpuDoubleComplex, gpuFloatComplex, gpuDoubleComplex>(gpublasHandle_t handle,        // handle
+                         const gpublasOperation_t op_A,   // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const gpublasOperation_t op_B,   // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const size_t m,                  // size(A,1) & size(C,1)
+                         const size_t n,                  // size(B,2) & size(C,2)
+                         const size_t k,                  // size(A,2) & size(B,1) <= 2^17
+                         const gpuDoubleComplex *alpha,   //
+                         const gpuDoubleComplex *const A, // input
+                         const size_t lda,                // leading dimension
+                         const gpuFloatComplex *const B,  // input
+                         const size_t ldb,                // leading dimension
+                         const gpuDoubleComplex *beta,    //
+                         gpuDoubleComplex *const C,       // output A*B
+                         const size_t ldc,                // leading dimension
+                         const unsigned num_moduli,       // #moduli, 2 <= num_moduli <= 20
+                         const bool fastmode,             // false (accurate-mode) or true (fast-mode)
+                         void *const work);               // workspace allocated in advance
+
+template <>
+std::vector<double> gemm<gpuFloatComplex, gpuDoubleComplex, gpuDoubleComplex>(gpublasHandle_t handle,        // handle
+                         const gpublasOperation_t op_A,   // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const gpublasOperation_t op_B,   // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const size_t m,                  // size(A,1) & size(C,1)
+                         const size_t n,                  // size(B,2) & size(C,2)
+                         const size_t k,                  // size(A,2) & size(B,1) <= 2^17
+                         const gpuDoubleComplex *alpha,   //
+                         const gpuFloatComplex *const A,  // input
+                         const size_t lda,                // leading dimension
+                         const gpuDoubleComplex *const B, // input
+                         const size_t ldb,                // leading dimension
+                         const gpuDoubleComplex *beta,    //
+                         gpuDoubleComplex *const C,       // output A*B
+                         const size_t ldc,                // leading dimension
+                         const unsigned num_moduli,       // #moduli, 2 <= num_moduli <= 20
+                         const bool fastmode,             // false (accurate-mode) or true (fast-mode)
+                         void *const work);               // workspace allocated in advance
+
+template <>
+std::vector<double> gemm<gpuDoubleComplex, gpuFloatComplex, gpuFloatComplex>(gpublasHandle_t handle,        // handle
+                         const gpublasOperation_t op_A,   // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const gpublasOperation_t op_B,   // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const size_t m,                  // size(A,1) & size(C,1)
+                         const size_t n,                  // size(B,2) & size(C,2)
+                         const size_t k,                  // size(A,2) & size(B,1) <= 2^17
+                         const gpuFloatComplex *alpha,    //
+                         const gpuDoubleComplex *const A, // input
+                         const size_t lda,                // leading dimension
+                         const gpuFloatComplex *const B,  // input
+                         const size_t ldb,                // leading dimension
+                         const gpuFloatComplex *beta,     //
+                         gpuFloatComplex *const C,        // output A*B
+                         const size_t ldc,                // leading dimension
+                         const unsigned num_moduli,       // #moduli, 2 <= num_moduli <= 20
+                         const bool fastmode,             // false (accurate-mode) or true (fast-mode)
+                         void *const work);               // workspace allocated in advance
+
+template <>
+std::vector<double> gemm<gpuFloatComplex, gpuDoubleComplex, gpuFloatComplex>(gpublasHandle_t handle,        // handle
+                         const gpublasOperation_t op_A,   // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const gpublasOperation_t op_B,   // GPUBLAS_OP_N or GPUBLAS_OP_T
+                         const size_t m,                  // size(A,1) & size(C,1)
+                         const size_t n,                  // size(B,2) & size(C,2)
+                         const size_t k,                  // size(A,2) & size(B,1) <= 2^17
+                         const gpuFloatComplex *alpha,    //
+                         const gpuFloatComplex *const A,  // input
+                         const size_t lda,                // leading dimension
+                         const gpuDoubleComplex *const B, // input
+                         const size_t ldb,                // leading dimension
+                         const gpuFloatComplex *beta,     //
+                         gpuFloatComplex *const C,        // output A*B
+                         const size_t ldc,                // leading dimension
+                         const unsigned num_moduli,       // #moduli, 2 <= num_moduli <= 20
+                         const bool fastmode,             // false (accurate-mode) or true (fast-mode)
+                         void *const work);               // workspace allocated in advance
 
 } // namespace gemmul8
