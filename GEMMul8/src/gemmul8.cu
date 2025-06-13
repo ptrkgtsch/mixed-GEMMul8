@@ -378,7 +378,7 @@ std::vector<double> gemm_mixed(gpublasHandle_t handle,          // handle
     const size_t size_vecA   = (((m + 15) >> 4) << 4);   // multiple of 16
     const unsigned table_idx = num_moduli - 2;
     const unsigned numM      = oz2_table::numM[table_idx]; // numM <= 2
-    const bool is_numM_1     = numM == 1;
+    const bool is_numM_1     = numM == 1 || std::is_same_v<TC, float>;
     constexpr int32_t one    = 1;
     constexpr int32_t zero   = 0;
 
@@ -512,7 +512,7 @@ std::vector<double> gemm_mixed_C(gpublasHandle_t handle,        // handle
     const size_t size_vecA   = (((m + 15) >> 4) << 4);   // multiple of 16
     const unsigned table_idx = num_moduli - 2;
     const unsigned numM      = oz2_table::numM[table_idx]; // numM <= 2
-    const bool is_numM_1     = numM == 1;
+    const bool is_numM_1     = numM == 1 || std::is_same_v<TC, gpuFloatComplex>;
     constexpr int32_t one    = 1;
     constexpr int32_t zero   = 0;
 
