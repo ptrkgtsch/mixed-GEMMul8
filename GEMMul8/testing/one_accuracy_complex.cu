@@ -25,15 +25,15 @@ int main() {
     gpuMalloc(&work_gemm, worksize);
     gpuDeviceSynchronize();
 
-    gpuFloatComplex *devAf = reinterpret_cast<gpuFloatComplex *>(work_gpu);
+    gpuDoubleComplex *devAd = reinterpret_cast<gpuDoubleComplex *>(work_gpu);
+    gpuDoubleComplex *devBd = devAd + m * k;
+    gpuDoubleComplex *devCd = devBd + k * n;
+    gpuFloatComplex *devAf = reinterpret_cast<gpuFloatComplex *>(devCd + m * n);
     gpuFloatComplex *devBf = devAf + m * k;
     gpuFloatComplex *devCf = devBf + k * n;
 
     gpuDoubleComplex *cpuCd = workd_cpu;
     gpuFloatComplex *cpuCf  = workf_cpu;
-    gpuDoubleComplex *devAd = reinterpret_cast<gpuDoubleComplex *>(devCf + m * n);
-    gpuDoubleComplex *devBd = devAd + m * k;
-    gpuDoubleComplex *devCd = devBd + k * n;
 
     makemat::randmat_C<gpuFloatComplex>(m, k, devAf, PHI, seed);
     makemat::randmat_C<gpuFloatComplex>(k, n, devBf, PHI, seed);
