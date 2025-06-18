@@ -28,7 +28,12 @@ size_t workSize(const size_t m,            // size(A,1) & size(C,1) <= 2^17
                 const size_t k,            // size(A,2) & size(B,1) <= 2^17
                 const unsigned num_moduli) // 2 <= num_moduli <= 20
 {
+#if defined(__HIPCC__)
+    const size_t k16       = ((k + 15) >> 4) << 4;
+    const size_t lda8i     =  k16 % 1024 == 0 ? k16 + 64 : k16;
+#else
     const size_t lda8i     = ((k + 15) >> 4) << 4;
+#endif
     const size_t ldb8i     = lda8i;
     const size_t sizeA     = lda8i * m;
     const size_t sizeB     = ldb8i * n;
@@ -105,7 +110,12 @@ std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
     //------------------------------
     // set constants
     //------------------------------
+#if defined(__HIPCC__)
+    const size_t k16         = ((k + 15) >> 4) << 4;
+    const size_t lda8i       =  k16 % 1024 == 0 ? k16 + 64 : k16;
+#else
     const size_t lda8i       = ((k + 15) >> 4) << 4; // multiple of 16
+#endif
     const size_t ldb8i       = lda8i;
     const size_t sizeA       = lda8i * m;
     const size_t sizeB       = ldb8i * n;
@@ -238,7 +248,12 @@ std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
     //------------------------------
     // set constants
     //------------------------------
+#if defined(__HIPCC__)
+    const size_t k16         = ((k + 15) >> 4) << 4;
+    const size_t lda8i       =  k16 % 1024 == 0 ? k16 + 64 : k16;
+#else
     const size_t lda8i       = ((k + 15) >> 4) << 4; // multiple of 16
+#endif
     const size_t ldb8i       = lda8i;
     const size_t sizeA       = lda8i * m;
     const size_t sizeB       = ldb8i * n;
@@ -365,7 +380,12 @@ std::vector<double> gemm_mixed(gpublasHandle_t handle,          // handle
     //------------------------------
     // set constants
     //------------------------------
+#if defined(__HIPCC__)
+    const size_t k16         = ((k + 15) >> 4) << 4;
+    const size_t lda8i       =  k16 % 1024 == 0 ? k16 + 64 : k16;
+#else
     const size_t lda8i       = ((k + 15) >> 4) << 4; // multiple of 16
+#endif
     const size_t ldb8i       = lda8i;
     const size_t sizeA       = lda8i * m;
     const size_t sizeB       = ldb8i * n;
@@ -499,7 +519,12 @@ std::vector<double> gemm_mixed_C(gpublasHandle_t handle,        // handle
     //------------------------------
     // set constants
     //------------------------------
-    const size_t lda8i       = ((2 * k + 15) >> 4) << 4; // multiple of 16
+#if defined(__HIPCC__)
+    const size_t k16         = ((k + 15) >> 4) << 4;
+    const size_t lda8i       =  k16 % 1024 == 0 ? k16 + 64 : k16;
+#else
+    const size_t lda8i       = ((k + 15) >> 4) << 4; // multiple of 16
+#endif
     const size_t ldb8i       = lda8i;
     const size_t sizeA       = lda8i * 2 * m;
     const size_t sizeB       = ldb8i * 2 * n;
