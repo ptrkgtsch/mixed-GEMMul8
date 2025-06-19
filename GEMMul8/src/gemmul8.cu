@@ -34,12 +34,13 @@ size_t workSize(const size_t m,            // size(A,1) & size(C,1) <= 2^17
 #else
     const size_t lda8i     = ((k + 15) >> 4) << 4;
 #endif
+    const size_t m_pad     = ((m + 15) >> 4) << 4;
     const size_t ldb8i     = lda8i;
-    const size_t sizeA     = lda8i * m;
+    const size_t sizeA     = lda8i * m_pad;
     const size_t sizeB     = ldb8i * n;
-    const size_t sizeC     = ((m * n + 15) >> 4) << 4;
+    const size_t sizeC     = ((m_pad * n + 15) >> 4) << 4;
 #if defined(__HIPCC__)
-    const size_t sizeC32i  = m % 1024 == 0 ? (((m+1) * n + 15) >> 4) << 4 : sizeC;
+    const size_t sizeC32i  = m % 1024 == 0 ? (((m_pad+1) * n + 15) >> 4) << 4 : sizeC;
 #else
     const size_t sizeC32i  = sizeC;
 #endif
@@ -117,11 +118,12 @@ std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
     const size_t lda8i       = ((k + 15) >> 4) << 4; // multiple of 16
 #endif
     const size_t ldb8i       = lda8i;
-    const size_t sizeA       = lda8i * m;
+    const size_t m_pad     = ((m + 15) >> 4) << 4;
+    const size_t sizeA       = lda8i * m_pad;
     const size_t sizeB       = ldb8i * n;
-    const size_t sizeC       = ((m * n + 15) >> 4) << 4; // multiple of 16
+    const size_t sizeC       = ((m_pad * n + 15) >> 4) << 4; // multiple of 16
 #if defined(__HIPCC__)
-    const size_t sizeC32i    = m % 1024 == 0 ? (((m+1) * n + 15) >> 4) << 4 : sizeC;
+    const size_t sizeC32i    = m % 1024 == 0 ? (((m_pad+1) * n + 15) >> 4) << 4 : sizeC;
 #else
     const size_t sizeC32i    = sizeC;
 #endif
@@ -179,9 +181,9 @@ std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
     //------------------------------
     timing_start(timetmp);
     if (fastmode) {
-        oz2_util::vecnorm::scaling<double>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, table_idx);
+        oz2_util::vecnorm::scaling<double>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, table_idx);
     } else {
-        oz2_util::int8tc::scaling<double>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
+        oz2_util::int8tc::scaling<double>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, C32i, table_idx);
     }
     timing_stop(timetmp, timer[0]);
 
@@ -191,7 +193,7 @@ std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
         // C32i := A8i*B8i
         //------------------------------
         timing_start(timetmp);
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         timing_stop(timetmp, timer[1]);
 
         //------------------------------
@@ -214,7 +216,7 @@ std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
     // C := diag(2^sftA) * C * diag(2^sftB)
     //------------------------------
     timing_start(timetmp);
-    oz2_util::inverse_scaling(is_numM_1, num_moduli, m, n, C8u, sizeC, C, ldc, sftA, sftB, *alpha, *beta);
+    oz2_util::inverse_scaling(is_numM_1, num_moduli, m, n, C8u, m_pad, sizeC, C, ldc, sftA, sftB, *alpha, *beta);
     timing_stop(timetmp, timer[3]);
 
     return timer;
@@ -255,11 +257,12 @@ std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
     const size_t lda8i       = ((k + 15) >> 4) << 4; // multiple of 16
 #endif
     const size_t ldb8i       = lda8i;
-    const size_t sizeA       = lda8i * m;
+    const size_t m_pad     = ((m + 15) >> 4) << 4;
+    const size_t sizeA       = lda8i * m_pad;
     const size_t sizeB       = ldb8i * n;
-    const size_t sizeC       = ((m * n + 15) >> 4) << 4; // multiple of 16
+    const size_t sizeC       = ((m_pad * n + 15) >> 4) << 4; // multiple of 16
 #if defined(__HIPCC__)
-    const size_t sizeC32i    = m % 1024 == 0 ? (((m+1) * n + 15) >> 4) << 4 : sizeC;
+    const size_t sizeC32i    = m % 1024 == 0 ? (((m_pad+1) * n + 15) >> 4) << 4 : sizeC;
 #else
     const size_t sizeC32i    = sizeC;
 #endif
@@ -311,9 +314,9 @@ std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
     //------------------------------
     timing_start(timetmp);
     if (fastmode) {
-        oz2_util::vecnorm::scaling<float>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, table_idx);
+        oz2_util::vecnorm::scaling<float>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, table_idx);
     } else {
-        oz2_util::int8tc::scaling<float>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
+        oz2_util::int8tc::scaling<float>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, C32i, table_idx);
     }
     timing_stop(timetmp, timer[0]);
 
@@ -323,7 +326,7 @@ std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
         // C32i := A8i*B8i
         //------------------------------
         timing_start(timetmp);
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         timing_stop(timetmp, timer[1]);
 
         //------------------------------
@@ -346,7 +349,7 @@ std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
     // C := diag(2^sftA) * C * diag(2^sftB)
     //------------------------------
     timing_start(timetmp);
-    oz2_util::inverse_scaling(num_moduli, m, n, C8u, sizeC, C, ldc, sftA, sftB, *alpha, *beta);
+    oz2_util::inverse_scaling(num_moduli, m, n, C8u, m_pad, sizeC, C, ldc, sftA, sftB, *alpha, *beta);
     timing_stop(timetmp, timer[3]);
 
     return timer;
@@ -387,11 +390,12 @@ std::vector<double> gemm_mixed(gpublasHandle_t handle,          // handle
     const size_t lda8i       = ((k + 15) >> 4) << 4; // multiple of 16
 #endif
     const size_t ldb8i       = lda8i;
-    const size_t sizeA       = lda8i * m;
+    const size_t m_pad     = ((m + 15) >> 4) << 4;
+    const size_t sizeA       = lda8i * m_pad;
     const size_t sizeB       = ldb8i * n;
-    const size_t sizeC       = ((m * n + 15) >> 4) << 4; // multiple of 16
+    const size_t sizeC       = ((m_pad * n + 15) >> 4) << 4; // multiple of 16
 #if defined(__HIPCC__)
-    const size_t sizeC32i    = m % 1024 == 0 ? (((m+1) * n + 15) >> 4) << 4 : sizeC;
+    const size_t sizeC32i    = m % 1024 == 0 ? (((m_pad+1) * n + 15) >> 4) << 4 : sizeC;
 #else
     const size_t sizeC32i    = sizeC;
 #endif
@@ -450,9 +454,9 @@ std::vector<double> gemm_mixed(gpublasHandle_t handle,          // handle
     //------------------------------
     timing_start(timetmp);
     if (fastmode) {
-        oz2_util::vecnorm::scaling<TA, TB>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, table_idx);
+        oz2_util::vecnorm::scaling<TA, TB>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, table_idx);
     } else {
-        oz2_util::int8tc::scaling<TA, TB>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
+        oz2_util::int8tc::scaling<TA, TB>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, C32i, table_idx);
     }
     timing_stop(timetmp, timer[0]);
 
@@ -462,7 +466,7 @@ std::vector<double> gemm_mixed(gpublasHandle_t handle,          // handle
         // C32i := A8i*B8i
         //------------------------------
         timing_start(timetmp);
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         timing_stop(timetmp, timer[1]);
 
         //------------------------------
@@ -485,7 +489,7 @@ std::vector<double> gemm_mixed(gpublasHandle_t handle,          // handle
     // C := diag(2^sftA) * C * diag(2^sftB)
     //------------------------------
     timing_start(timetmp);
-    oz2_util::inverse_scaling<TC>(is_numM_1, num_moduli, m, n, C8u, sizeC, C, ldc, sftA, sftB, *alpha, *beta);
+    oz2_util::inverse_scaling<TC>(is_numM_1, num_moduli, m, n, C8u, m_pad, sizeC, C, ldc, sftA, sftB, *alpha, *beta);
     timing_stop(timetmp, timer[3]);
 
     return timer;
@@ -526,9 +530,10 @@ std::vector<double> gemm_mixed_C(gpublasHandle_t handle,        // handle
     const size_t lda8i       = ((k + 15) >> 4) << 4; // multiple of 16
 #endif
     const size_t ldb8i       = lda8i;
-    const size_t sizeA       = lda8i * 2 * m;
+    const size_t m2_pad      = ((2 * m + 15) >> 4) << 4;
+    const size_t sizeA       = lda8i * m2_pad;
     const size_t sizeB       = ldb8i * 2 * n;
-    const size_t sizeC       = ((2 * m * 2 * n + 15) >> 4) << 4; // multiple of 16
+    const size_t sizeC       = ((m2_pad * 2 * n + 15) >> 4) << 4; // multiple of 16
 #if defined(__HIPCC__)
     const size_t sizeC32i    = m % 512 == 0 ? ((2 * (m+1) * 2 * n + 15) >> 4) << 4 : sizeC;
 #else
@@ -589,9 +594,9 @@ std::vector<double> gemm_mixed_C(gpublasHandle_t handle,        // handle
     //------------------------------
     timing_start(timetmp);
     if (fastmode) {
-        oz2_util::vecnorm::scaling_C<TA, TB>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, table_idx);
+        oz2_util::vecnorm::scaling_C<TA, TB>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m2_pad, sftA, B8i, ldb8i, ldb8i * 2 * n, sftB, table_idx);
     } else {
-        oz2_util::int8tc::scaling_C<TA, TB>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
+        oz2_util::int8tc::scaling_C<TA, TB>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m2_pad, sftA, B8i, ldb8i, ldb8i * 2 * n, sftB, C32i, table_idx);
     }
     timing_stop(timetmp, timer[0]);
 
@@ -601,7 +606,7 @@ std::vector<double> gemm_mixed_C(gpublasHandle_t handle,        // handle
         // C32i := A8i*B8i
         //------------------------------
         timing_start(timetmp);
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, 2 * m, 2 * n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, 2 * m, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m2_pad, 2 * n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m2_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         timing_stop(timetmp, timer[1]);
 
         //------------------------------
@@ -624,7 +629,7 @@ std::vector<double> gemm_mixed_C(gpublasHandle_t handle,        // handle
     // C := diag(2^sftA) * C * diag(2^sftB)
     //------------------------------
     timing_start(timetmp);
-    oz2_util::inverse_scaling_C<TC>(is_numM_1, num_moduli, m, n, C8u, sizeC, C, ldc, sftA, sftB, *alpha, *beta);
+    oz2_util::inverse_scaling_C<TC>(is_numM_1, num_moduli, m, n, C8u, m2_pad, sizeC, C, ldc, sftA, sftB, *alpha, *beta);
     timing_stop(timetmp, timer[3]);
 
     return timer;

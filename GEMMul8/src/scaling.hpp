@@ -1794,9 +1794,11 @@ __inline__ void scaling(gpublasHandle_t handle,        // handle
                         const size_t ldb,              // leading dimension
                         int8_t *const A8i,             // output (k * m)
                         const size_t lda8i,            // leading dimension
+                        const size_t incA8i,           // increment between the A8i
                         int16_t *const sftA,           // exponent of shift values for rows of A
                         int8_t *const B8i,             // output (k * n)
                         const size_t ldb8i,            // leading dimension
+                        const size_t incB8i,           // increment between the B8i
                         int16_t *const sftB,           // exponent of shift values for cols of B
                         int32_t *const C32i,           // tmp (m * n)
                         const unsigned table_idx)      //
@@ -1850,14 +1852,14 @@ __inline__ void scaling(gpublasHandle_t handle,        // handle
     gpuDeviceSynchronize();
     const float log2M = oz2_table::int8tc::log2M[table_idx]; // fld(log2(M-1)/2 - 0.5)
     if (op_A == GPUBLAS_OP_N) {
-        scalingA_kernel<TA><<<m, oz2_const::threads_scaling>>>(n, k, lda8i * m, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
+        scalingA_kernel<TA><<<m, oz2_const::threads_scaling>>>(n, k, incA8i, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
     } else {
-        scalingAT_kernel<TA><<<m, oz2_const::threads_scaling>>>(n, k, lda8i * m, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
+        scalingAT_kernel<TA><<<m, oz2_const::threads_scaling>>>(n, k, incA8i, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
     }
     if (op_B == GPUBLAS_OP_N) {
-        scalingB_kernel<TB><<<n, oz2_const::threads_scaling>>>(m, k, ldb8i * n, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
+        scalingB_kernel<TB><<<n, oz2_const::threads_scaling>>>(m, k, incB8i, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
     } else {
-        scalingBT_kernel<TB><<<n, oz2_const::threads_scaling>>>(m, k, ldb8i * n, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
+        scalingBT_kernel<TB><<<n, oz2_const::threads_scaling>>>(m, k, incB8i, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
     }
 }
 
@@ -1875,9 +1877,11 @@ __inline__ void scaling_C(gpublasHandle_t handle,        // handle
                         const size_t ldb,              // leading dimension
                         int8_t *const A8i,             // output (k * m)
                         const size_t lda8i,            // leading dimension
+                        const size_t incA8i,           // increment between the A8i
                         int16_t *const sftA,           // exponent of shift values for rows of A
                         int8_t *const B8i,             // output (k * n)
                         const size_t ldb8i,            // leading dimension
+                        const size_t incB8i,           // increment between the B8i
                         int16_t *const sftB,           // exponent of shift values for cols of B
                         int32_t *const C32i,           // tmp (m * n)
                         const unsigned table_idx)      //
@@ -1947,22 +1951,22 @@ __inline__ void scaling_C(gpublasHandle_t handle,        // handle
     gpuDeviceSynchronize();
     const float log2M = oz2_table::int8tc::log2M[table_idx]; // fld(log2(M-1)/2 - 0.5)
     if (op_A == GPUBLAS_OP_N) {
-        scalingA_kernel_C<TA><<<m, oz2_const::threads_scaling>>>(n, m, k, lda8i * 2 * m, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
+        scalingA_kernel_C<TA><<<m, oz2_const::threads_scaling>>>(n, m, k, incA8i, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
     }
     if (op_B == GPUBLAS_OP_N) {
-        scalingB_kernel_C<TB><<<n, oz2_const::threads_scaling>>>(m, k, n, ldb8i * 2 * n, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
+        scalingB_kernel_C<TB><<<n, oz2_const::threads_scaling>>>(m, k, n, incB8i, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
     }
     if (op_A == GPUBLAS_OP_T) {
-        scalingB_kernel_C_minusBL<TA><<<m, oz2_const::threads_scaling>>>(n, k, m, lda8i * 2 * m, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
+        scalingB_kernel_C_minusBL<TA><<<m, oz2_const::threads_scaling>>>(n, k, m, incA8i, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
     }
     if (op_B == GPUBLAS_OP_T) {
-        scalingA_kernel_C_minusTR<TB><<<n, oz2_const::threads_scaling>>>(m, k, n, ldb8i * 2 * n, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
+        scalingA_kernel_C_minusTR<TB><<<n, oz2_const::threads_scaling>>>(m, k, n, incB8i, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
     }
     if (op_A == GPUBLAS_OP_C) {
-        scalingAT_kernel_C<TA><<<m, oz2_const::threads_scaling>>>(n, k, m, lda8i * 2 * m, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
+        scalingAT_kernel_C<TA><<<m, oz2_const::threads_scaling>>>(n, k, m, incA8i, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
     }
     if (op_B == GPUBLAS_OP_C) {
-        scalingBT_kernel_C<TB><<<n, oz2_const::threads_scaling>>>(m, k, n, ldb8i * 2 * n, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
+        scalingBT_kernel_C<TB><<<n, oz2_const::threads_scaling>>>(m, k, n, incB8i, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
     }
 }
 
@@ -2180,9 +2184,11 @@ __inline__ void scaling(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLA
                         const size_t ldb,              // leading dimension
                         int8_t *const A8i,             // output (k * m)
                         const size_t lda8i,            // leading dimension
+                        const size_t incA8i,           // increment between the A8i
                         int16_t *const sftA,           // exponent of shift values for rows of A
                         int8_t *const B8i,             // output (k * n)
                         const size_t ldb8i,            // leading dimension
+                        const size_t incB8i,           // increment between the B8i
                         int16_t *const sftB,           // exponent of shift values for cols of B
                         const unsigned table_idx)      //
 {
@@ -2194,11 +2200,11 @@ __inline__ void scaling(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLA
             compute_sftA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, reinterpret_cast<TA *>(A8i), lda + 1, sftA, log2M);
             dim3 grid((m + TILE_DIM-1) / TILE_DIM, (k + TILE_DIM-1) / TILE_DIM);
             dim3 threads_scalingA(TILE_DIM, NY);
-            scalingA_kernel_separated<TA><<<grid, threads_scalingA>>>(m, k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA);
+            scalingA_kernel_separated<TA><<<grid, threads_scalingA>>>(m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sftA);
         }
         else
 #endif
-            scalingA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
+            scalingA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, incA8i, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
     if (op_B != GPUBLAS_OP_N) {
 #if defined(__HIPCC__)
@@ -2207,17 +2213,17 @@ __inline__ void scaling(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUBLA
             compute_sftA_kernel<TB><<<m, oz2_const::threads_scaling>>>(k, reinterpret_cast<TB *>(B8i), ldb + 1, sftB, log2M);
             dim3 grid((n + TILE_DIM-1) / TILE_DIM, (k + TILE_DIM-1) / TILE_DIM);
             dim3 threads_scalingA(TILE_DIM, NY);
-            scalingA_kernel_separated<TB><<<grid, threads_scalingA>>>(n, k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB);
+            scalingA_kernel_separated<TB><<<grid, threads_scalingA>>>(n, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB);
         }
         else
 #endif
-            scalingA_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
+            scalingA_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     }
     if (op_A != GPUBLAS_OP_N) {
-        scalingB_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, lda8i * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
+        scalingB_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, incA8i, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
     if (op_B == GPUBLAS_OP_N) {
-        scalingB_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, ldb8i * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
+        scalingB_kernel<TB><<<n, oz2_const::threads_scaling>>>(k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     }
 }
 
@@ -2234,9 +2240,11 @@ __inline__ void scaling_C(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUB
                         const size_t ldb,              // leading dimension
                         int8_t *const A8i,             // output (k * m)
                         const size_t lda8i,            // leading dimension
+                        const size_t incA8i,           // increment between the A8i
                         int16_t *const sftA,           // exponent of shift values for rows of A
                         int8_t *const B8i,             // output (k * n)
                         const size_t ldb8i,            // leading dimension
+                        const size_t incB8i,           // increment between the B8i
                         int16_t *const sftB,           // exponent of shift values for cols of B
                         const unsigned table_idx)      //
 {
@@ -2248,11 +2256,11 @@ __inline__ void scaling_C(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUB
             compute_sftA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, reinterpret_cast<TA *>(A8i), lda + 1, sftA, log2M);
             dim3 grid((m + TILE_DIM-1) / TILE_DIM, (k + TILE_DIM-1) / TILE_DIM);
             dim3 threads_scalingA(TILE_DIM, NY);
-            scalingA_kernel_separated_C<TA><<<grid, threads_scalingA>>>(m, k, lda8i * 2 * m, num_moduli, A, lda, A8i, lda8i, sftA);
+            scalingA_kernel_separated_C<TA><<<grid, threads_scalingA>>>(m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sftA);
         }
         else
 #endif
-            scalingA_kernel_C<TA><<<m, oz2_const::threads_scaling>>>(m, k, lda8i * 2 * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
+            scalingA_kernel_C<TA><<<m, oz2_const::threads_scaling>>>(m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
     if (op_B == GPUBLAS_OP_T) {
 #if defined(__HIPCC__)
@@ -2261,11 +2269,11 @@ __inline__ void scaling_C(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUB
             compute_sftA_kernel<TB><<<m, oz2_const::threads_scaling>>>(k, reinterpret_cast<TB *>(B8i), ldb + 1, sftB, log2M);
             dim3 grid((n + TILE_DIM-1) / TILE_DIM, (k + TILE_DIM-1) / TILE_DIM);
             dim3 threads_scalingA(TILE_DIM, NY);
-            scalingA_kernel_separated_C_minusTR<TB><<<grid, threads_scalingA>>>(n, k, ldb8i * 2 * n, num_moduli, B, ldb, B8i, ldb8i, sftB);
+            scalingA_kernel_separated_C_minusTR<TB><<<grid, threads_scalingA>>>(n, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB);
         }
         else
 #endif
-            scalingA_kernel_C_minusTR<TB><<<n, oz2_const::threads_scaling>>>(m, k, ldb8i * 2 * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
+            scalingA_kernel_C_minusTR<TB><<<n, oz2_const::threads_scaling>>>(m, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     }
     if (op_B == GPUBLAS_OP_C) {
 #if defined(__HIPCC__)
@@ -2274,20 +2282,20 @@ __inline__ void scaling_C(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUB
             compute_sftA_kernel<TB><<<m, oz2_const::threads_scaling>>>(k, reinterpret_cast<TB *>(B8i), ldb + 1, sftB, log2M);
             dim3 grid((n + TILE_DIM-1) / TILE_DIM, (k + TILE_DIM-1) / TILE_DIM);
             dim3 threads_scalingA(TILE_DIM, NY);
-            scalingA_kernel_separated_C<TB><<<grid, threads_scalingA>>>(n, k, ldb8i * 2 * n, num_moduli, B, ldb, B8i, ldb8i, sftB);
+            scalingA_kernel_separated_C<TB><<<grid, threads_scalingA>>>(n, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB);
         }
         else
 #endif
-            scalingA_kernel_C<TB><<<n, oz2_const::threads_scaling>>>(m, k, ldb8i * 2 * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
+            scalingA_kernel_C<TB><<<n, oz2_const::threads_scaling>>>(m, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     }
     if (op_B == GPUBLAS_OP_N) {
-        scalingB_kernel_C<TB><<<n, oz2_const::threads_scaling>>>(k, n, ldb8i * 2 * n, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
+        scalingB_kernel_C<TB><<<n, oz2_const::threads_scaling>>>(k, n, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     }
     if (op_A == GPUBLAS_OP_T) {
-        scalingB_kernel_C_minusBL<TA><<<m, oz2_const::threads_scaling>>>(k, m, lda8i * 2 * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
+        scalingB_kernel_C_minusBL<TA><<<m, oz2_const::threads_scaling>>>(k, m, incA8i, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
     if (op_A == GPUBLAS_OP_C) {
-        scalingB_kernel_C<TA><<<m, oz2_const::threads_scaling>>>(k, m, lda8i * 2 * m, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
+        scalingB_kernel_C<TA><<<m, oz2_const::threads_scaling>>>(k, m, incA8i, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
 }
 
