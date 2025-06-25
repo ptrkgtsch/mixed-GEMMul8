@@ -1841,12 +1841,13 @@ __inline__ void scaling(gpublasHandle_t handle,        // handle
     constexpr int32_t alpha = 1;
     constexpr int32_t beta  = 0;
     gpuDeviceSynchronize();
+    const size_t m_pad = ((m + 3) >> 2) << 2;
 #if defined(__HIPCC__)
-    const size_t ldc32i = m % 1024 == 0 ? m + 1 : m;
+    const size_t ldc32i = m_pad % 1024 == 0 ? m_pad + 4 : m_pad;
 #else
-    const size_t ldc32i = m;
+    const size_t ldc32i = m_pad;
 #endif
-    gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m, n, lda8i, &alpha, A8i, GPU_R_8I, lda8i, B8i, GPU_R_8I, ldb8i, &beta, C32i, GPU_R_32I, ldc32i, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+    gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &alpha, A8i, GPU_R_8I, lda8i, B8i, GPU_R_8I, ldb8i, &beta, C32i, GPU_R_32I, ldc32i, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
 
     // extract high order bits from A and B
     gpuDeviceSynchronize();
