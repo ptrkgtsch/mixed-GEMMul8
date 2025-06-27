@@ -90,6 +90,7 @@ set(TEST_SOURCES
     profile_one_call.cu
     one_accuracy.cu
     one_accuracy_complex.cu
+    test_float_complex.cu
 )
 
 foreach(TEST_SOURCE ${TEST_SOURCES})
