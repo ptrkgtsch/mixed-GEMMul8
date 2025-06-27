@@ -294,7 +294,7 @@ __global__ void scalingA_kernel_separated(const size_t m,               // size(
     }
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __global__ void scalingA_kernel_separated_C(const size_t m,               // size(A,1)
                                 const size_t k,                         // size(A,2)
                                 const size_t incA8i,                    // lda8i * m
@@ -358,18 +358,27 @@ __global__ void scalingA_kernel_separated_C(const size_t m,               // siz
             out4.z = mod_8i<T_real>(in4_real.z, j);
             out4.w = mod_8i<T_real>(in4_real.w, j);
             *reinterpret_cast<char4 *>(A8i + j * incA8i + ny       * lda8i + nx    ) = out4;
-            *reinterpret_cast<char4 *>(A8i + j * incA8i + (ny + m) * lda8i + nx + k) = out4;
+            if constexpr (addCol) {
+                *reinterpret_cast<char4 *>(A8i + j * incA8i + (ny + m) * lda8i + nx + k) = out4;
 
-            out4.x = mod_8i<T_real>(in4_imag.x, j);
-            out4.y = mod_8i<T_real>(in4_imag.y, j);
-            out4.z = mod_8i<T_real>(in4_imag.z, j);
-            out4.w = mod_8i<T_real>(in4_imag.w, j);
-            *reinterpret_cast<char4 *>(A8i + j * incA8i + (ny + m) * lda8i + nx    ) = out4;
-            out4.x = - out4.x;
-            out4.y = - out4.y;
-            out4.z = - out4.z;
-            out4.w = - out4.w;
-            *reinterpret_cast<char4 *>(A8i + j * incA8i + ny       * lda8i + nx + k) = out4;
+                out4.x = mod_8i<T_real>(in4_imag.x, j);
+                out4.y = mod_8i<T_real>(in4_imag.y, j);
+                out4.z = mod_8i<T_real>(in4_imag.z, j);
+                out4.w = mod_8i<T_real>(in4_imag.w, j);
+                *reinterpret_cast<char4 *>(A8i + j * incA8i + (ny + m) * lda8i + nx    ) = out4;
+                out4.x = - out4.x;
+                out4.y = - out4.y;
+                out4.z = - out4.z;
+                out4.w = - out4.w;
+                *reinterpret_cast<char4 *>(A8i + j * incA8i + ny       * lda8i + nx + k) = out4;
+            }
+            else {
+                out4.x = - mod_8i<T_real>(in4_imag.x, j);
+                out4.y = - mod_8i<T_real>(in4_imag.y, j);
+                out4.z = - mod_8i<T_real>(in4_imag.z, j);
+                out4.w = - mod_8i<T_real>(in4_imag.w, j);
+                *reinterpret_cast<char4 *>(A8i + j * incA8i + ny       * lda8i + nx + k) = out4;
+            }
         }
     }
     else if (nx < k && ny < m) {
@@ -378,22 +387,23 @@ __global__ void scalingA_kernel_separated_C(const size_t m,               // siz
 
         for (unsigned j = 0; j < num_moduli; ++j) {
             *(A8i + j * incA8i + ny       * lda8i + nx    ) = mod_8i<T_real>(val_real, j);
-            *(A8i + j * incA8i + (ny + m) * lda8i + nx + k) = mod_8i<T_real>(val_real, j);
-
-
-            *(A8i + j * incA8i + (ny + m) * lda8i + nx    ) = mod_8i<T_real>(val_imag, j);
+            if constexpr (addCol) {
+                *(A8i + j * incA8i + (ny + m) * lda8i + nx + k) = mod_8i<T_real>(val_real, j);
+                *(A8i + j * incA8i + (ny + m) * lda8i + nx    ) = mod_8i<T_real>(val_imag, j);
+            }
             *(A8i + j * incA8i + ny       * lda8i + nx + k) = - mod_8i<T_real>(val_imag, j);
         }
     }
     else if (nx < lda8i && ny < m) {
         for (unsigned j = 0; j < num_moduli; ++j) {
-            *(A8i + j * incA8i + (ny + m) * lda8i + nx + k) = 0;
+            if constexpr (addCol)
+                *(A8i + j * incA8i + (ny + m) * lda8i + nx + k) = 0;
             *(A8i + j * incA8i + ny       * lda8i + nx + k) = 0;
         }
     }
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __global__ void scalingA_kernel_separated_C_minusTR(const size_t m,               // size(A,1)
                                 const size_t k,                         // size(A,2)
                                 const size_t incA8i,                    // lda8i * m
@@ -457,18 +467,21 @@ __global__ void scalingA_kernel_separated_C_minusTR(const size_t m,             
             out4.z = mod_8i<T_real>(in4_real.z, j);
             out4.w = mod_8i<T_real>(in4_real.w, j);
             *reinterpret_cast<char4 *>(A8i + j * incA8i + ny       * lda8i + nx    ) = out4;
-            *reinterpret_cast<char4 *>(A8i + j * incA8i + (ny + m) * lda8i + nx + k) = out4;
+            if constexpr (addCol)
+                *reinterpret_cast<char4 *>(A8i + j * incA8i + (ny + m) * lda8i + nx + k) = out4;
 
             out4.x = mod_8i<T_real>(in4_imag.x, j);
             out4.y = mod_8i<T_real>(in4_imag.y, j);
             out4.z = mod_8i<T_real>(in4_imag.z, j);
             out4.w = mod_8i<T_real>(in4_imag.w, j);
             *reinterpret_cast<char4 *>(A8i + j * incA8i + ny       * lda8i + nx + k) = out4;
-            out4.x = - out4.x;
-            out4.y = - out4.y;
-            out4.z = - out4.z;
-            out4.w = - out4.w;
-            *reinterpret_cast<char4 *>(A8i + j * incA8i + (ny + m) * lda8i + nx    ) = out4;
+            if constexpr (addCol) {
+                out4.x = - out4.x;
+                out4.y = - out4.y;
+                out4.z = - out4.z;
+                out4.w = - out4.w;
+                *reinterpret_cast<char4 *>(A8i + j * incA8i + (ny + m) * lda8i + nx    ) = out4;
+            }
         }
     }
     else if (nx < k && ny < m) {
@@ -477,16 +490,17 @@ __global__ void scalingA_kernel_separated_C_minusTR(const size_t m,             
 
         for (unsigned j = 0; j < num_moduli; ++j) {
             *(A8i + j * incA8i + ny       * lda8i + nx    ) = mod_8i<T_real>(val_real, j);
-            *(A8i + j * incA8i + (ny + m) * lda8i + nx + k) = mod_8i<T_real>(val_real, j);
-
-
-            *(A8i + j * incA8i + (ny + m) * lda8i + nx    ) = - mod_8i<T_real>(val_imag, j);
+            if constexpr (addCol) {
+                *(A8i + j * incA8i + (ny + m) * lda8i + nx + k) = mod_8i<T_real>(val_real, j);
+                *(A8i + j * incA8i + (ny + m) * lda8i + nx    ) = - mod_8i<T_real>(val_imag, j);
+            }
             *(A8i + j * incA8i + ny       * lda8i + nx + k) = mod_8i<T_real>(val_imag, j);
         }
     }
     else if (nx < lda8i && ny < m) {
         for (unsigned j = 0; j < num_moduli; ++j) {
-            *(A8i + j * incA8i + (ny + m) * lda8i + nx + k) = 0;
+            if constexpr (addCol)
+                *(A8i + j * incA8i + (ny + m) * lda8i + nx + k) = 0;
             *(A8i + j * incA8i + ny       * lda8i + nx + k) = 0;
         }
     }
@@ -552,7 +566,7 @@ __forceinline__ __device__ void scalingA(const size_t row_idx,
     }
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __forceinline__ __device__ void scalingA_C(const size_t row_idx,
                                     const size_t m,                 // size(A,1)
                                     const size_t k,                 // size(A,2)
@@ -593,19 +607,28 @@ __forceinline__ __device__ void scalingA_C(const size_t row_idx,
             out4.w = mod_8i<T_real>(in4_real.w, j);
 
             *reinterpret_cast<char4 *>(A8i + row_idx       * lda8i + j * incA8i + idx    ) = out4;
-            *reinterpret_cast<char4 *>(A8i + (row_idx + m) * lda8i + j * incA8i + idx + k) = out4;
+            if constexpr (addCol) {
+                *reinterpret_cast<char4 *>(A8i + (row_idx + m) * lda8i + j * incA8i + idx + k) = out4;
 
-            out4.x = mod_8i<T_real>(in4_imag.x, j);
-            out4.y = mod_8i<T_real>(in4_imag.y, j);
-            out4.z = mod_8i<T_real>(in4_imag.z, j);
-            out4.w = mod_8i<T_real>(in4_imag.w, j);
+                out4.x = mod_8i<T_real>(in4_imag.x, j);
+                out4.y = mod_8i<T_real>(in4_imag.y, j);
+                out4.z = mod_8i<T_real>(in4_imag.z, j);
+                out4.w = mod_8i<T_real>(in4_imag.w, j);
 
-            *reinterpret_cast<char4 *>(A8i + (row_idx + m) * lda8i + j * incA8i + idx    ) = out4;
-            out4.x = - out4.x;
-            out4.y = - out4.y;
-            out4.z = - out4.z;
-            out4.w = - out4.w;
-            *reinterpret_cast<char4 *>(A8i + row_idx       * lda8i + j * incA8i + idx + k) = out4;
+                *reinterpret_cast<char4 *>(A8i + (row_idx + m) * lda8i + j * incA8i + idx    ) = out4;
+                out4.x = - out4.x;
+                out4.y = - out4.y;
+                out4.z = - out4.z;
+                out4.w = - out4.w;
+                *reinterpret_cast<char4 *>(A8i + row_idx       * lda8i + j * incA8i + idx + k) = out4;
+            }
+            else {
+                out4.x = - mod_8i<T_real>(in4_imag.x, j);
+                out4.y = - mod_8i<T_real>(in4_imag.y, j);
+                out4.z = - mod_8i<T_real>(in4_imag.z, j);
+                out4.w = - mod_8i<T_real>(in4_imag.w, j);
+                *reinterpret_cast<char4 *>(A8i + row_idx       * lda8i + j * incA8i + idx + k) = out4;
+            }
         }
     }
     i = i << 2;  // fill rest of the matrices
@@ -614,21 +637,23 @@ __forceinline__ __device__ void scalingA_C(const size_t row_idx,
         T_real val_imag = Ttrunc<T_real>(Tscalbn<T_real>(oz2_type_utils::Cimag(in[i * lda]), sft));
         for (unsigned j = 0; j < num_moduli; ++j) {
             *(A8i + row_idx       * lda8i + j * incA8i + i    ) = mod_8i<T_real>(val_real, j);
-            *(A8i + (row_idx + m) * lda8i + j * incA8i + i + k) = mod_8i<T_real>(val_real, j);
-
-            *(A8i + (row_idx + m) * lda8i + j * incA8i + i    ) = mod_8i<T_real>(val_imag, j);
+            if constexpr (addCol) {
+                *(A8i + (row_idx + m) * lda8i + j * incA8i + i + k) = mod_8i<T_real>(val_real, j);
+                *(A8i + (row_idx + m) * lda8i + j * incA8i + i    ) = mod_8i<T_real>(val_imag, j);
+            }
             *(A8i + row_idx       * lda8i + j * incA8i + i + k) = - mod_8i<T_real>(val_imag, j);
         }
     }
     for (; i + k < lda8i; i += blockDim.x) {
         for (unsigned j = 0; j < num_moduli; ++j) {
-            *(A8i + (row_idx + m) * lda8i + j * incA8i + i + k) = 0;
+            if constexpr (addCol)
+                *(A8i + (row_idx + m) * lda8i + j * incA8i + i + k) = 0;
             *(A8i + row_idx       * lda8i + j * incA8i + i + k) = 0;
         }
     }
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __forceinline__ __device__ void scalingA_C_minusTR(const size_t row_idx,
                                 const size_t m,                 // size(A,1)
                                 const size_t k,                 // size(A,2)
@@ -669,7 +694,8 @@ __forceinline__ __device__ void scalingA_C_minusTR(const size_t row_idx,
             out4.w = mod_8i<T_real>(in4_real.w, j);
 
             *reinterpret_cast<char4 *>(A8i + row_idx       * lda8i + j * incA8i + idx    ) = out4;
-            *reinterpret_cast<char4 *>(A8i + (row_idx + m) * lda8i + j * incA8i + idx + k) = out4;
+            if constexpr (addCol)
+                *reinterpret_cast<char4 *>(A8i + (row_idx + m) * lda8i + j * incA8i + idx + k) = out4;
 
             out4.x = mod_8i<T_real>(in4_imag.x, j);
             out4.y = mod_8i<T_real>(in4_imag.y, j);
@@ -677,11 +703,13 @@ __forceinline__ __device__ void scalingA_C_minusTR(const size_t row_idx,
             out4.w = mod_8i<T_real>(in4_imag.w, j);
 
             *reinterpret_cast<char4 *>(A8i + row_idx       * lda8i + j * incA8i + idx + k) = out4;
-            out4.x = - out4.x;
-            out4.y = - out4.y;
-            out4.z = - out4.z;
-            out4.w = - out4.w;
-            *reinterpret_cast<char4 *>(A8i + (row_idx + m) * lda8i + j * incA8i + idx    ) = out4;
+            if constexpr (addCol) {
+                out4.x = - out4.x;
+                out4.y = - out4.y;
+                out4.z = - out4.z;
+                out4.w = - out4.w;
+                *reinterpret_cast<char4 *>(A8i + (row_idx + m) * lda8i + j * incA8i + idx    ) = out4;
+            }
         }
     }
     i = i << 2;  // fill rest of the matrices
@@ -690,15 +718,17 @@ __forceinline__ __device__ void scalingA_C_minusTR(const size_t row_idx,
         T_real val_imag = Ttrunc<T_real>(Tscalbn<T_real>(oz2_type_utils::Cimag(in[i * lda]), sft));
         for (unsigned j = 0; j < num_moduli; ++j) {
             *(A8i + row_idx       * lda8i + j * incA8i + i    ) = mod_8i<T_real>(val_real, j);
-            *(A8i + (row_idx + m) * lda8i + j * incA8i + i + k) = mod_8i<T_real>(val_real, j);
-
-            *(A8i + (row_idx + m) * lda8i + j * incA8i + i    ) = - mod_8i<T_real>(val_imag, j);
+            if constexpr (addCol) {
+                *(A8i + (row_idx + m) * lda8i + j * incA8i + i + k) = mod_8i<T_real>(val_real, j);
+                *(A8i + (row_idx + m) * lda8i + j * incA8i + i    ) = - mod_8i<T_real>(val_imag, j);
+            }
             *(A8i + row_idx       * lda8i + j * incA8i + i + k) = mod_8i<T_real>(val_imag, j);
         }
     }
     for (; i + k < lda8i; i += blockDim.x) {
         for (unsigned j = 0; j < num_moduli; ++j) {
-            *(A8i + (row_idx + m) * lda8i + j * incA8i + i + k) = 0;
+            if constexpr (addCol)
+                *(A8i + (row_idx + m) * lda8i + j * incA8i + i + k) = 0;
             *(A8i + row_idx       * lda8i + j * incA8i + i + k) = 0;
         }
     }
@@ -763,7 +793,7 @@ __forceinline__ __device__ void scalingB(const size_t col_idx,
     }
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __forceinline__ __device__ void scalingB_C(const size_t col_idx,
                                 const size_t k,                 // size(B,1)
                                 const size_t n,                 // size(B,2)
@@ -805,18 +835,21 @@ __forceinline__ __device__ void scalingB_C(const size_t col_idx,
             out4.w = mod_8i<T_real>(in4_real.w, j);
 
             *reinterpret_cast<char4 *>(B8i + col_idx       * ldb8i + j * incB8i + idx    ) = out4;
-            *reinterpret_cast<char4 *>(B8i + (col_idx + n) * ldb8i + j * incB8i + idx + k) = out4;
+            if constexpr (addCol)
+                *reinterpret_cast<char4 *>(B8i + (col_idx + n) * ldb8i + j * incB8i + idx + k) = out4;
 
             out4.x = mod_8i<T_real>(in4_imag.x, j);
             out4.y = mod_8i<T_real>(in4_imag.y, j);
             out4.z = mod_8i<T_real>(in4_imag.z, j);
             out4.w = mod_8i<T_real>(in4_imag.w, j);
             *reinterpret_cast<char4 *>(B8i + col_idx       * ldb8i + j * incB8i + idx + k) = out4;
-            out4.x = - out4.x;
-            out4.y = - out4.y;
-            out4.z = - out4.z;
-            out4.w = - out4.w;
-            *reinterpret_cast<char4 *>(B8i + (col_idx + n) * ldb8i + j * incB8i + idx    ) = out4;
+            if constexpr (addCol) {
+                out4.x = - out4.x;
+                out4.y = - out4.y;
+                out4.z = - out4.z;
+                out4.w = - out4.w;
+                *reinterpret_cast<char4 *>(B8i + (col_idx + n) * ldb8i + j * incB8i + idx    ) = out4;
+            }
         }
     }
     i = i << 2;
@@ -826,21 +859,23 @@ __forceinline__ __device__ void scalingB_C(const size_t col_idx,
 
         for (unsigned j = 0; j < num_moduli; ++j) {
             *(B8i + col_idx       * ldb8i + j * incB8i + i    ) = mod_8i<T_real>(val_real, j);
-            *(B8i + (col_idx + n) * ldb8i + j * incB8i + i + k) = mod_8i<T_real>(val_real, j);
-
+            if constexpr (addCol)
+                *(B8i + (col_idx + n) * ldb8i + j * incB8i + i + k) = mod_8i<T_real>(val_real, j);
             *(B8i + col_idx       * ldb8i + j * incB8i + i + k) = mod_8i<T_real>(val_imag, j);
-            *(B8i + (col_idx + n) * ldb8i + j * incB8i + i    ) = - mod_8i<T_real>(val_imag, j);
+            if constexpr (addCol)
+                *(B8i + (col_idx + n) * ldb8i + j * incB8i + i    ) = - mod_8i<T_real>(val_imag, j);
         }
     }
     for (; i + k < ldb8i; i += blockDim.x) {
         for (unsigned j = 0; j < num_moduli; ++j) {
-            *(B8i + (col_idx + n) * ldb8i + j * incB8i + i + k) = 0;
+            if constexpr (addCol)
+                *(B8i + (col_idx + n) * ldb8i + j * incB8i + i + k) = 0;
             *(B8i + col_idx       * ldb8i + j * incB8i + i + k) = 0;
         }
     }
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __forceinline__ __device__ void scalingB_C_minusBL(const size_t col_idx,
                                 const size_t k,                 // size(B,1)
                                 const size_t n,                 // size(B,2)
@@ -882,19 +917,28 @@ __forceinline__ __device__ void scalingB_C_minusBL(const size_t col_idx,
             out4.w = mod_8i<T_real>(in4_real.w, j);
 
             *reinterpret_cast<char4 *>(B8i + col_idx       * ldb8i + j * incB8i + idx    ) = out4;
-            *reinterpret_cast<char4 *>(B8i + (col_idx + n) * ldb8i + j * incB8i + idx + k) = out4;
+            if constexpr (addCol) {
+                *reinterpret_cast<char4 *>(B8i + (col_idx + n) * ldb8i + j * incB8i + idx + k) = out4;
 
-            out4.x = mod_8i<T_real>(in4_imag.x, j);
-            out4.y = mod_8i<T_real>(in4_imag.y, j);
-            out4.z = mod_8i<T_real>(in4_imag.z, j);
-            out4.w = mod_8i<T_real>(in4_imag.w, j);
+                out4.x = mod_8i<T_real>(in4_imag.x, j);
+                out4.y = mod_8i<T_real>(in4_imag.y, j);
+                out4.z = mod_8i<T_real>(in4_imag.z, j);
+                out4.w = mod_8i<T_real>(in4_imag.w, j);
 
-            *reinterpret_cast<char4 *>(B8i + (col_idx + n) * ldb8i + j * incB8i + idx    ) = out4;
-            out4.x = - out4.x;
-            out4.y = - out4.y;
-            out4.z = - out4.z;
-            out4.w = - out4.w;
-            *reinterpret_cast<char4 *>(B8i + col_idx       * ldb8i + j * incB8i + idx + k) = out4;
+                *reinterpret_cast<char4 *>(B8i + (col_idx + n) * ldb8i + j * incB8i + idx    ) = out4;
+                out4.x = - out4.x;
+                out4.y = - out4.y;
+                out4.z = - out4.z;
+                out4.w = - out4.w;
+                *reinterpret_cast<char4 *>(B8i + col_idx       * ldb8i + j * incB8i + idx + k) = out4;
+            }
+            else {
+                out4.x = - mod_8i<T_real>(in4_imag.x, j);
+                out4.y = - mod_8i<T_real>(in4_imag.y, j);
+                out4.z = - mod_8i<T_real>(in4_imag.z, j);
+                out4.w = - mod_8i<T_real>(in4_imag.w, j);
+                *reinterpret_cast<char4 *>(B8i + col_idx       * ldb8i + j * incB8i + idx + k) = out4;
+            }
         }
     }
     i = i << 2;
@@ -904,15 +948,18 @@ __forceinline__ __device__ void scalingB_C_minusBL(const size_t col_idx,
 
         for (unsigned j = 0; j < num_moduli; ++j) {
             *(B8i + col_idx       * ldb8i + j * incB8i + i    ) = mod_8i<T_real>(val_real, j);
-            *(B8i + (col_idx + n) * ldb8i + j * incB8i + i + k) = mod_8i<T_real>(val_real, j);
+            if constexpr (addCol)
+                *(B8i + (col_idx + n) * ldb8i + j * incB8i + i + k) = mod_8i<T_real>(val_real, j);
 
             *(B8i + col_idx       * ldb8i + j * incB8i + i + k) = - mod_8i<T_real>(val_imag, j);
-            *(B8i + (col_idx + n) * ldb8i + j * incB8i + i    ) = mod_8i<T_real>(val_imag, j);
+            if constexpr (addCol)
+                *(B8i + (col_idx + n) * ldb8i + j * incB8i + i    ) = mod_8i<T_real>(val_imag, j);
         }
     }
     for (; i + k < ldb8i; i += blockDim.x) {
         for (unsigned j = 0; j < num_moduli; ++j) {
-            *(B8i + (col_idx + n) * ldb8i + j * incB8i + i + k) = 0;
+            if constexpr (addCol)
+                *(B8i + (col_idx + n) * ldb8i + j * incB8i + i + k) = 0;
             *(B8i + col_idx       * ldb8i + j * incB8i + i + k) = 0;
         }
     }
@@ -1531,7 +1578,7 @@ __global__ void scalingA_kernel(const size_t n,                         // size(
     }
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __global__ void scalingA_kernel_C(const size_t n,                       // size(C,2)
                                 const size_t m,                         // size(A,1)
                                 const size_t k,                         // size(A,2)
@@ -1552,14 +1599,14 @@ __global__ void scalingA_kernel_C(const size_t n,                       // size(
     const int32_t amax = find_amax<int32_t>(C32i + row_idx, 2 * n, ldc32i, smem);
     const int sft      = compute_sft(amax, sftAi, log2M);
 
-    scalingA_C<T>(row_idx, m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sft);
+    scalingA_C<T, addCol>(row_idx, m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sft);
 
     if (threadIdx.x == 0) {
         sftA[row_idx] = -sft;
     }
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __global__ void scalingA_kernel_C_minusTR(const size_t n,               // size(C,2)
                                 const size_t m,                         // size(A,1)
                                 const size_t k,                         // size(A,2)
@@ -1580,7 +1627,7 @@ __global__ void scalingA_kernel_C_minusTR(const size_t n,               // size(
     const int32_t amax = find_amax<int32_t>(C32i + row_idx, 2 * n, ldc32i, smem);
     const int sft      = compute_sft(amax, sftAi, log2M);
 
-    scalingA_C_minusTR<T>(row_idx, m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sft);
+    scalingA_C_minusTR<T, addCol>(row_idx, m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sft);
 
     if (threadIdx.x == 0) {
         sftA[row_idx] = -sft;
@@ -1614,7 +1661,7 @@ __global__ void scalingB_kernel(const size_t m,                         // size(
     }
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __global__ void scalingB_kernel_C(const size_t m,                         // size(C,1)
                                 const size_t k,                         // size(B,1)
                                 const size_t n,                         // size(B,2)
@@ -1635,14 +1682,14 @@ __global__ void scalingB_kernel_C(const size_t m,                         // siz
     const int32_t amax = find_amax<int32_t>(C32i + col_idx * ldc32i, 2 * m, 1u, smem);
     const int sft      = compute_sft(amax, sftBi, log2M);
 
-    scalingB_C<T>(col_idx, k, n, incB8i, num_moduli, B, ldb, B8i, ldb8i, sft);
+    scalingB_C<T, addCol>(col_idx, k, n, incB8i, num_moduli, B, ldb, B8i, ldb8i, sft);
 
     if (threadIdx.x == 0) {
         sftB[col_idx] = -sft;
     }
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __global__ void scalingB_kernel_C_minusBL(const size_t m,               // size(C,1)
                                 const size_t k,                         // size(B,1)
                                 const size_t n,                         // size(B,2)
@@ -1663,7 +1710,7 @@ __global__ void scalingB_kernel_C_minusBL(const size_t m,               // size(
     const int32_t amax = find_amax<int32_t>(C32i + col_idx * ldc32i, 2 * m, 1u, smem);
     const int sft      = compute_sft(amax, sftBi, log2M);
 
-    scalingB_C_minusBL<T>(col_idx, k, n, incB8i, num_moduli, B, ldb, B8i, ldb8i, sft);
+    scalingB_C_minusBL<T, addCol>(col_idx, k, n, incB8i, num_moduli, B, ldb, B8i, ldb8i, sft);
 
     if (threadIdx.x == 0) {
         sftB[col_idx] = -sft;
@@ -1697,7 +1744,7 @@ __global__ void scalingAT_kernel(const size_t n,                         // size
     }
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __global__ void scalingAT_kernel_C(const size_t n,                       // size(C,2)
                                  const size_t k,                         // size(AT,1)
                                  const size_t m,                         // size(AT,2)
@@ -1718,7 +1765,7 @@ __global__ void scalingAT_kernel_C(const size_t n,                       // size
     const int32_t amax = find_amax<int32_t>(C32i + col_idx, 2 * n, ldc32i, smem);
     const int sft      = compute_sft(amax, sftAi, log2M);
 
-    scalingB_C<T>(col_idx, k, m, incA8i, num_moduli, A, lda, A8i, lda8i, sft);
+    scalingB_C<T, addCol>(col_idx, k, m, incA8i, num_moduli, A, lda, A8i, lda8i, sft);
 
     if (threadIdx.x == 0) {
         sftA[col_idx] = -sft;
@@ -1752,7 +1799,7 @@ __global__ void scalingBT_kernel(const size_t m,                         // size
     }
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __global__ void scalingBT_kernel_C(const size_t m,                       // size(C,1)
                                  const size_t k,                         // size(B,2)
                                  const size_t n,                         // size(B,1)
@@ -1773,7 +1820,7 @@ __global__ void scalingBT_kernel_C(const size_t m,                       // size
     const int32_t amax = find_amax<int32_t>(C32i + row_idx * ldc32i, 2 * m, 1u, smem);
     const int sft      = compute_sft(amax, sftBi, log2M);
 
-    scalingA_C<T>(row_idx, n, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sft);
+    scalingA_C<T, addCol>(row_idx, n, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sft);
 
     if (threadIdx.x == 0) {
         sftB[row_idx] = -sft;
@@ -1841,10 +1888,11 @@ __inline__ void scaling(gpublasHandle_t handle,        // handle
     constexpr int32_t alpha = 1;
     constexpr int32_t beta  = 0;
     gpuDeviceSynchronize();
-    const size_t m_pad = ((m + 3) >> 2) << 2;
 #if defined(__HIPCC__)
+    const size_t m_pad = ((m + 3) >> 2) << 2;
     const size_t ldc32i = m_pad % 1024 == 0 ? m_pad + 4 : m_pad;
 #else
+    const size_t m_pad = m;
     const size_t ldc32i = m_pad;
 #endif
     gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &alpha, A8i, GPU_R_8I, lda8i, B8i, GPU_R_8I, ldb8i, &beta, C32i, GPU_R_32I, ldc32i, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
@@ -1942,32 +1990,34 @@ __inline__ void scaling_C(gpublasHandle_t handle,        // handle
     constexpr int32_t beta  = 0;
     gpuDeviceSynchronize();
 #if defined(__HIPCC__)
-    const size_t ldc32i = m % 512 == 0 ? 2 * m + 1 : 2 * m;
+    const size_t m2_pad = ((2 * m + 3) >> 2) << 2;
+    const size_t ldc32i = m2_pad % 512 == 0 ? m2_pad + 1 : m2_pad;
 #else
-    const size_t ldc32i = 2 * m;
+    const size_t m2_pad = 2 * m;
+    const size_t ldc32i = m2_pad;
 #endif
-    gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, 2 * m, 2 * n, lda8i, &alpha, A8i, GPU_R_8I, lda8i, B8i, GPU_R_8I, ldb8i, &beta, C32i, GPU_R_32I, ldc32i, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+    gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m2_pad, 2 * n, lda8i, &alpha, A8i, GPU_R_8I, lda8i, B8i, GPU_R_8I, ldb8i, &beta, C32i, GPU_R_32I, ldc32i, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
 
     // extract high order bits from A and B
     gpuDeviceSynchronize();
     const float log2M = oz2_table::int8tc::log2M[table_idx]; // fld(log2(M-1)/2 - 0.5)
     if (op_A == GPUBLAS_OP_N) {
-        scalingA_kernel_C<TA><<<m, oz2_const::threads_scaling>>>(n, m, k, incA8i, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
+        scalingA_kernel_C<TA, true><<<m, oz2_const::threads_scaling>>>(n, m, k, incA8i, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
     }
     if (op_B == GPUBLAS_OP_N) {
-        scalingB_kernel_C<TB><<<n, oz2_const::threads_scaling>>>(m, k, n, incB8i, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
+        scalingB_kernel_C<TB, false><<<n, oz2_const::threads_scaling>>>(m, k, n, incB8i, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
     }
     if (op_A == GPUBLAS_OP_T) {
-        scalingB_kernel_C_minusBL<TA><<<m, oz2_const::threads_scaling>>>(n, k, m, incA8i, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
+        scalingB_kernel_C_minusBL<TA, true><<<m, oz2_const::threads_scaling>>>(n, k, m, incA8i, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
     }
     if (op_B == GPUBLAS_OP_T) {
-        scalingA_kernel_C_minusTR<TB><<<n, oz2_const::threads_scaling>>>(m, k, n, incB8i, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
+        scalingA_kernel_C_minusTR<TB, false><<<n, oz2_const::threads_scaling>>>(m, k, n, incB8i, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
     }
     if (op_A == GPUBLAS_OP_C) {
-        scalingAT_kernel_C<TA><<<m, oz2_const::threads_scaling>>>(n, k, m, incA8i, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
+        scalingAT_kernel_C<TA, true><<<m, oz2_const::threads_scaling>>>(n, k, m, incA8i, num_moduli, A, lda, C32i, ldc32i, A8i, lda8i, sftA, log2M);
     }
     if (op_B == GPUBLAS_OP_C) {
-        scalingBT_kernel_C<TB><<<n, oz2_const::threads_scaling>>>(m, k, n, incB8i, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
+        scalingBT_kernel_C<TB, false><<<n, oz2_const::threads_scaling>>>(m, k, n, incB8i, num_moduli, B, ldb, C32i, ldc32i, B8i, ldb8i, sftB, log2M);
     }
 }
 
@@ -2034,8 +2084,10 @@ __global__ void scalingA_kernel(const size_t k,                   // size(A,2)
 /* Writes into real matrices that encode the complex matrix W as such (+ transposed for scalingA):
  *     W_r  -W_i
  * W ~ W_i   W_r
+ *
+ * The second column of matrices of the result is only added if addCol = true.
  */
-template <typename T>
+template <typename T, bool addCol>
 __global__ void scalingA_kernel_C(const size_t m,           // size(A,1)
                                 const size_t k,                   // size(A,2)
                                 const size_t incA8i,              // lda8i * m
@@ -2059,11 +2111,11 @@ __global__ void scalingA_kernel_C(const size_t m,           // size(A,1)
         sftA[row_idx] = -sft;
     }
 
-    scalingA_C<T>(row_idx, m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sft);
+    scalingA_C<T, addCol>(row_idx, m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sft);
 }
 
 // Same but for applying GPUBLAS_OP_T, so do not exchange imaginary part blocks, just transpose.
-template <typename T>
+template <typename T,bool addCol>
 __global__ void scalingA_kernel_C_minusTR(const size_t m,           // size(A,1)
                                 const size_t k,                   // size(A,2)
                                 const size_t incA8i,              // lda8i * m
@@ -2087,7 +2139,7 @@ __global__ void scalingA_kernel_C_minusTR(const size_t m,           // size(A,1)
         sftA[row_idx] = -sft;
     }
 
-    scalingA_C_minusTR<T>(row_idx, m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sft);
+    scalingA_C_minusTR<T, addCol>(row_idx, m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sft);
 }
 
 template <typename T>
@@ -2118,7 +2170,7 @@ __global__ void scalingB_kernel(const size_t k,                   // size(B,1)
  *     W_r  -W_i
  * W ~ W_i   W_r
  */
-template <typename T>
+template <typename T, bool addCol>
 __global__ void scalingB_kernel_C(const size_t k,           // size(B,1)
                                 const size_t n,                   // size(B,2)
                                 const size_t incB8i,              // ldb8i * n
@@ -2142,10 +2194,10 @@ __global__ void scalingB_kernel_C(const size_t k,           // size(B,1)
         sftB[col_idx] = -sft;
     }
 
-    scalingB_C<T>(col_idx, k, n, incB8i, num_moduli, B, ldb, B8i, ldb8i, sft);
+    scalingB_C<T, addCol>(col_idx, k, n, incB8i, num_moduli, B, ldb, B8i, ldb8i, sft);
 }
 
-template <typename T>
+template <typename T, bool addCol>
 __global__ void scalingB_kernel_C_minusBL(const size_t k,           // size(B,1)
                                 const size_t n,                   // size(B,2)
                                 const size_t incB8i,              // ldb8i * n
@@ -2169,7 +2221,7 @@ __global__ void scalingB_kernel_C_minusBL(const size_t k,           // size(B,1)
         sftB[col_idx] = -sft;
     }
 
-    scalingB_C_minusBL<T>(col_idx, k, n, incB8i, num_moduli, B, ldb, B8i, ldb8i, sft);
+    scalingB_C_minusBL<T, addCol>(col_idx, k, n, incB8i, num_moduli, B, ldb, B8i, ldb8i, sft);
 }
 
 template <typename TA, typename TB>
@@ -2257,11 +2309,11 @@ __inline__ void scaling_C(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUB
             compute_sftA_kernel<TA><<<m, oz2_const::threads_scaling>>>(k, reinterpret_cast<TA *>(A8i), lda + 1, sftA, log2M);
             dim3 grid((m + TILE_DIM-1) / TILE_DIM, (k + TILE_DIM-1) / TILE_DIM);
             dim3 threads_scalingA(TILE_DIM, NY);
-            scalingA_kernel_separated_C<TA><<<grid, threads_scalingA>>>(m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sftA);
+            scalingA_kernel_separated_C<TA, true><<<grid, threads_scalingA>>>(m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sftA);
         }
         else
 #endif
-            scalingA_kernel_C<TA><<<m, oz2_const::threads_scaling>>>(m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
+            scalingA_kernel_C<TA, true><<<m, oz2_const::threads_scaling>>>(m, k, incA8i, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
     if (op_B == GPUBLAS_OP_T) {
 #if defined(__HIPCC__)
@@ -2270,11 +2322,11 @@ __inline__ void scaling_C(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUB
             compute_sftA_kernel<TB><<<m, oz2_const::threads_scaling>>>(k, reinterpret_cast<TB *>(B8i), ldb + 1, sftB, log2M);
             dim3 grid((n + TILE_DIM-1) / TILE_DIM, (k + TILE_DIM-1) / TILE_DIM);
             dim3 threads_scalingA(TILE_DIM, NY);
-            scalingA_kernel_separated_C_minusTR<TB><<<grid, threads_scalingA>>>(n, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB);
+            scalingA_kernel_separated_C_minusTR<TB, false><<<grid, threads_scalingA>>>(n, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB);
         }
         else
 #endif
-            scalingA_kernel_C_minusTR<TB><<<n, oz2_const::threads_scaling>>>(m, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
+            scalingA_kernel_C_minusTR<TB, false><<<n, oz2_const::threads_scaling>>>(m, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     }
     if (op_B == GPUBLAS_OP_C) {
 #if defined(__HIPCC__)
@@ -2283,20 +2335,20 @@ __inline__ void scaling_C(const gpublasOperation_t op_A, // GPUBLAS_OP_N or GPUB
             compute_sftA_kernel<TB><<<m, oz2_const::threads_scaling>>>(k, reinterpret_cast<TB *>(B8i), ldb + 1, sftB, log2M);
             dim3 grid((n + TILE_DIM-1) / TILE_DIM, (k + TILE_DIM-1) / TILE_DIM);
             dim3 threads_scalingA(TILE_DIM, NY);
-            scalingA_kernel_separated_C<TB><<<grid, threads_scalingA>>>(n, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB);
+            scalingA_kernel_separated_C<TB, false><<<grid, threads_scalingA>>>(n, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB);
         }
         else
 #endif
-            scalingA_kernel_C<TB><<<n, oz2_const::threads_scaling>>>(m, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
+            scalingA_kernel_C<TB, false><<<n, oz2_const::threads_scaling>>>(m, k, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     }
     if (op_B == GPUBLAS_OP_N) {
-        scalingB_kernel_C<TB><<<n, oz2_const::threads_scaling>>>(k, n, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
+        scalingB_kernel_C<TB, false><<<n, oz2_const::threads_scaling>>>(k, n, incB8i, num_moduli, B, ldb, B8i, ldb8i, sftB, log2M);
     }
     if (op_A == GPUBLAS_OP_T) {
-        scalingB_kernel_C_minusBL<TA><<<m, oz2_const::threads_scaling>>>(k, m, incA8i, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
+        scalingB_kernel_C_minusBL<TA, true><<<m, oz2_const::threads_scaling>>>(k, m, incA8i, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
     if (op_A == GPUBLAS_OP_C) {
-        scalingB_kernel_C<TA><<<m, oz2_const::threads_scaling>>>(k, m, incA8i, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
+        scalingB_kernel_C<TA, true><<<m, oz2_const::threads_scaling>>>(k, m, incA8i, num_moduli, A, lda, A8i, lda8i, sftA, log2M);
     }
 }
 
