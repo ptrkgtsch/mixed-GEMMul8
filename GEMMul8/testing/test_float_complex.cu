@@ -21,6 +21,7 @@
 #define PHI        0.0, 0.5, 1, 1.5
 #define SIZE       1024, 2048, 4096, 8192//, 16384
 #define NUM_MODULI 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+#define COMPUTE_TYPE gemmul8::COMPLEX_KARATSUBA_MULT
 
 #if defined(cuMpSGEMM_FLAG) && defined(__NVCC__)
     #include "cumpsgemm/cumpsgemm.hpp"
@@ -103,7 +104,7 @@ void accuracy_check(std::string &deviceName, std::string &dateTime) {
     const size_t num_moduli_max = *max_element(begin(num_moduli_list), end(num_moduli_list));
     gpuDoubleComplex *workd_cpu = new gpuDoubleComplex[m * n];
     gpuFloatComplex *workf_cpu  = new gpuFloatComplex[m * n];
-    size_t worksize             = gemmul8::workSize_C(m, n, k_max, num_moduli_max);
+    size_t worksize             = gemmul8::workSize(m, n, k_max, num_moduli_max, COMPUTE_TYPE);
     void *work_gpu;
     gpuMalloc(&work_gpu, (m * k_max + k_max * n + m * n) * (sizeof(gpuDoubleComplex) + sizeof(gpuFloatComplex)));
     gpuDeviceSynchronize();
@@ -197,7 +198,7 @@ void accuracy_check(std::string &deviceName, std::string &dateTime) {
             for (auto &num_moduli : num_moduli_list) {
                 std::vector<double> timestmp(4, 0);
                 gpuDeviceSynchronize();
-                timestmp = gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, true, work_gemm);
+                timestmp = gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, true, work_gemm, COMPUTE_TYPE);
                 gpuDeviceSynchronize();
                 gpuMemcpy(cpuCf, devCf, m * n * sizeof(gpuFloatComplex), gpuMemcpyDeviceToHost);
                 gpuDeviceSynchronize();
@@ -216,7 +217,7 @@ void accuracy_check(std::string &deviceName, std::string &dateTime) {
             for (auto &num_moduli : num_moduli_list) {
                 std::vector<double> timestmp(4);
                 gpuDeviceSynchronize();
-                timestmp = gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, false, work_gemm);
+                timestmp = gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, false, work_gemm, COMPUTE_TYPE);
                 gpuDeviceSynchronize();
                 gpuMemcpy(cpuCf, devCf, m * n * sizeof(gpuFloatComplex), gpuMemcpyDeviceToHost);
                 gpuDeviceSynchronize();
@@ -279,7 +280,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
     const size_t num_moduli_max = *max_element(begin(num_moduli_list), end(num_moduli_list));
     gpuDoubleComplex *workd_cpu = new gpuDoubleComplex[n_max * n_max];
     gpuFloatComplex *workf_cpu  = new gpuFloatComplex[n_max * n_max];
-    size_t worksize             = gemmul8::workSize_C(n_max, n_max, n_max, num_moduli_max);
+    size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max, COMPUTE_TYPE);
     void *work_gpu;
     gpuMalloc(&work_gpu, n_max * n_max * 3 * sizeof(gpuFloatComplex));
     gpuDeviceSynchronize();
@@ -457,7 +458,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
             std::vector<double> timestmp(4, 0);
 
             gpuDeviceSynchronize();
-            timestmp = gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, true, work_gemm);
+            timestmp = gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, true, work_gemm, COMPUTE_TYPE);
             gpuDeviceSynchronize();
             gpuMemcpy(cpuCf, devCf, m * n * sizeof(gpuFloatComplex), gpuMemcpyDeviceToHost);
             gpuDeviceSynchronize();
@@ -467,7 +468,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
             for (int iter = 0; iter < itermax; ++iter) {
                 gpuDeviceSynchronize();
                 start    = std::chrono::system_clock::now();
-                timestmp = gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, true, work_gemm);
+                timestmp = gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, true, work_gemm, COMPUTE_TYPE);
                 gpuDeviceSynchronize();
                 stop = std::chrono::system_clock::now();
                 time += std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
@@ -492,7 +493,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
             std::vector<double> timestmp(4);
 
             gpuDeviceSynchronize();
-            timestmp = gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, false, work_gemm);
+            timestmp = gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, false, work_gemm, COMPUTE_TYPE);
             gpuDeviceSynchronize();
             gpuMemcpy(cpuCf, devCf, m * n * sizeof(gpuFloatComplex), gpuMemcpyDeviceToHost);
             gpuDeviceSynchronize();
@@ -502,7 +503,7 @@ void time_check(std::string &deviceName, std::string &dateTime) {
             for (int iter = 0; iter < itermax; ++iter) {
                 gpuDeviceSynchronize();
                 start    = std::chrono::system_clock::now();
-                timestmp = gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, false, work_gemm);
+                timestmp = gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, false, work_gemm, COMPUTE_TYPE);
                 gpuDeviceSynchronize();
                 stop = std::chrono::system_clock::now();
                 time += std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count();
@@ -561,7 +562,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
     const size_t num_moduli_max = *max_element(begin(num_moduli_list), end(num_moduli_list));
     gpuDoubleComplex *workd_cpu = new gpuDoubleComplex[n_max * n_max];
     gpuFloatComplex *workf_cpu  = new gpuFloatComplex[n_max * n_max];
-    size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max);
+    size_t worksize             = gemmul8::workSize(n_max, n_max, n_max, num_moduli_max, COMPUTE_TYPE);
     void *work_gpu;
     gpuMalloc(&work_gpu, n_max * n_max * 3 * (sizeof(gpuDoubleComplex) + sizeof(gpuFloatComplex)));
     gpuDeviceSynchronize();
@@ -761,7 +762,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
             gpuDeviceSynchronize();
             res = getWatt::getWatt(
                 [&]() {
-                    gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, true, work_gemm);
+                    gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, true, work_gemm, COMPUTE_TYPE);
                 },
                 m,
                 n,
@@ -786,7 +787,7 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
 
             res = getWatt::getWatt(
                 [&]() {
-                    gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, false, work_gemm);
+                    gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m, num_moduli, false, work_gemm, COMPUTE_TYPE);
                 },
                 m,
                 n,

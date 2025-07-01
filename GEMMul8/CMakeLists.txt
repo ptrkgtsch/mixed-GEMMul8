@@ -11,7 +11,7 @@ if (${GPU_RUNTIME} MATCHES "HIP")
     set (VECTORADD_CXX_FLAGS "-fPIC")
     find_package(HIP 6.2.0 REQUIRED)
     find_package(hipblas REQUIRED)
-    add_compile_definitions(OCML_BASIC_ROUNDED_OPERATIONS) # for _ru and _rd modes (slow!)
+    add_compile_definitions(OCML_BASIC_ROUNDED_OPERATIONS) # for _ru and _rd modes (slow?)
     add_compile_definitions(HIP_ENABLE_WARP_SYNC_BUILTINS) # for __shfl_down_sync
     add_compile_options(-Wno-unused-result)
 
@@ -77,6 +77,7 @@ endif ()
 add_library(gemmul8_objs OBJECT ${CU_FILES})
 set_property(TARGET gemmul8_objs PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_include_directories(gemmul8_objs PUBLIC ${INCDIR})
+target_compile_options(gemmul8_objs PRIVATE -O3)
 
 # Create a static library from the object library
 add_library(gemmul8_static STATIC $<TARGET_OBJECTS:gemmul8_objs>)
@@ -86,6 +87,7 @@ if (${GPU_RUNTIME} MATCHES "CUDA")
 else ()
     target_link_libraries(gemmul8_static ${HIP_LIBRARIES})
 endif ()
+target_compile_options(gemmul8_static PRIVATE -O3)
 
 # Create a shared library from the object library
 # add_library(gemmul8 SHARED $<TARGET_OBJECTS:gemmul8_objs>)

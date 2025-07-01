@@ -6,6 +6,7 @@
 #include "gpu_arch.hpp"
 #define NUM_MOD 15
 #define PHI 0.5
+#define COMPUTE_TYPE gemmul8::COMPLEX_KARATSUBA_MULT
 
 int main() {
     gpublasHandle_t handle;
@@ -17,7 +18,7 @@ int main() {
     int n = m;
     gpuDoubleComplex *workd_cpu           = new gpuDoubleComplex[m * n];
     gpuFloatComplex *workf_cpu            = new gpuFloatComplex[m * n];
-    size_t worksize = gemmul8::workSize_C(m, n, k, NUM_MOD);
+    size_t worksize = gemmul8::workSize(m, n, k, NUM_MOD, COMPUTE_TYPE);
     void *work_gpu;
     gpuMalloc(&work_gpu, (m * k + k * n + m * n) * (sizeof(gpuFloatComplex) + sizeof(gpuDoubleComplex)));
     gpuDeviceSynchronize();
@@ -63,7 +64,7 @@ int main() {
 
     gpuDeviceSynchronize();
     gemmul8::gemm<gpuFloatComplex>(handle, GPUBLAS_OP_N, GPUBLAS_OP_N, m, n, k, &alphaf, devAf, m, devBf, k, &betaf, devCf, m,
-                         NUM_MOD, true, work_gemm);
+                         NUM_MOD, false, work_gemm, COMPUTE_TYPE);
     gpuDeviceSynchronize();
     gpuMemcpy(cpuCf, devCf, m * n * sizeof(gpuFloatComplex), gpuMemcpyDeviceToHost);
     gpuDeviceSynchronize();

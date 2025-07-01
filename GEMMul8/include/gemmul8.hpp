@@ -4,6 +4,12 @@
 
 namespace gemmul8 {
 
+typedef enum {
+    REAL_DEFAULT,
+    COMPLEX_BIG_MATRIX_ENCODE,
+    COMPLEX_KARATSUBA_MULT
+} computeType_t;
+
 // workSize returns work size required in gemm
 // Usage:
 //  void *work;
@@ -11,16 +17,8 @@ namespace gemmul8 {
 size_t workSize(const size_t m,             // size(A,1) & size(C,1)
                 const size_t n,             // size(B,2) & size(C,2)
                 const size_t k,             // size(A,2) & size(B,1) <= 2^17
-                const unsigned num_moduli); // #moduli, 2 <= num_moduli <= (DGEMM emulation) ? 20 : 19
-
-// workSize returns work size required in gemm if complex matrices are given
-// Usage:
-//  void *work;
-//  cudaMalloc(&work, workSize(m,n,k,num_moduli));
-size_t workSize_C(const size_t m,             // size(A,1) & size(C,1)
-                  const size_t n,             // size(B,2) & size(C,2)
-                  const size_t k,             // size(A,2) & size(B,1) <= 2^17
-                  const unsigned num_moduli); // #moduli, 2 <= num_moduli <= (DGEMM emulation) ? 20 : 19
+                const unsigned num_moduli,  // #moduli, 2 <= num_moduli <= (DGEMM emulation) ? 20 : 19
+                const computeType_t computeType = REAL_DEFAULT);
 
 // gemm returns computation time in second of each part
 // Usage:
@@ -44,7 +42,8 @@ std::vector<double> gemm(gpublasHandle_t handle,        // handle
                          const size_t ldc,             // leading dimension
                          const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,          // false (accurate-mode) or true (fast-mode)
-                         void *const work);            // workspace allocated in advance
+                         void *const work,             // workspace allocated in advance
+                         const computeType_t computeType = REAL_DEFAULT);
 
 template <>
 std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
@@ -63,7 +62,8 @@ std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
                                  const size_t ldc,             // leading dimension
                                  const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 20
                                  const bool fastmode,          // false (accurate-mode) or true (fast-mode)
-                                 void *const work);            // workspace allocated in advance
+                                 void *const work,             // workspace allocated in advance
+                                 const computeType_t computeType);
 
 template <>
 std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
@@ -82,7 +82,8 @@ std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
                                 const size_t ldc,             // leading dimension
                                 const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 19
                                 const bool fastmode,          // false (accurate-mode) or true (fast-mode)
-                                void *const work);            // workspace allocated in advance
+                                void *const work,             // workspace allocated in advance
+                                const computeType_t computeType);
 
 template <>
 std::vector<double> gemm<double, float, double>(gpublasHandle_t handle,        // handle
@@ -101,7 +102,8 @@ std::vector<double> gemm<double, float, double>(gpublasHandle_t handle,        /
                          const size_t ldc,             // leading dimension
                          const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,          // false (accurate-mode) or true (fast-mode)
-                         void *const work);            // workspace allocated in advance
+                         void *const work,             // workspace allocated in advance
+                         const computeType_t computeType);
 
 template <>
 std::vector<double> gemm<float, double, double>(gpublasHandle_t handle,        // handle
@@ -120,7 +122,8 @@ std::vector<double> gemm<float, double, double>(gpublasHandle_t handle,        /
                          const size_t ldc,             // leading dimension
                          const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,          // false (accurate-mode) or true (fast-mode)
-                         void *const work);            // workspace allocated in advance
+                         void *const work,             // workspace allocated in advance
+                         const computeType_t computeType);
 
 template <>
 std::vector<double> gemm<double, float, float>(gpublasHandle_t handle,        // handle
@@ -139,7 +142,8 @@ std::vector<double> gemm<double, float, float>(gpublasHandle_t handle,        //
                          const size_t ldc,             // leading dimension
                          const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,          // false (accurate-mode) or true (fast-mode)
-                         void *const work);            // workspace allocated in
+                         void *const work,             // workspace allocated in
+                         const computeType_t computeType);
 
 template <>
 std::vector<double> gemm<float, double, float>(gpublasHandle_t handle,        // handle
@@ -158,7 +162,8 @@ std::vector<double> gemm<float, double, float>(gpublasHandle_t handle,        //
                          const size_t ldc,             // leading dimension
                          const unsigned num_moduli,    // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,          // false (accurate-mode) or true (fast-mode)
-                         void *const work);            // workspace allocated in advance
+                         void *const work,             // workspace allocated in advance
+                         const computeType_t computeType);
 
 template <>
 std::vector<double> gemm<gpuFloatComplex, gpuFloatComplex, gpuFloatComplex>(gpublasHandle_t handle,        // handle
@@ -177,7 +182,8 @@ std::vector<double> gemm<gpuFloatComplex, gpuFloatComplex, gpuFloatComplex>(gpub
                          const size_t ldc,               // leading dimension
                          const unsigned num_moduli,      // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,            // false (accurate-mode) or true (fast-mode)
-                         void *const work);              // workspace allocated in advance
+                         void *const work,               // workspace allocated in advance
+                         const computeType_t computeType);
 
 template <>
 std::vector<double> gemm<gpuDoubleComplex, gpuDoubleComplex, gpuDoubleComplex>(gpublasHandle_t handle,        // handle
@@ -196,7 +202,8 @@ std::vector<double> gemm<gpuDoubleComplex, gpuDoubleComplex, gpuDoubleComplex>(g
                          const size_t ldc,                // leading dimension
                          const unsigned num_moduli,       // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,             // false (accurate-mode) or true (fast-mode)
-                         void *const work);               // workspace allocated in advance
+                         void *const work,               // workspace allocated in advance
+                         const computeType_t computeType);
 
 template <>
 std::vector<double> gemm<gpuDoubleComplex, gpuFloatComplex, gpuDoubleComplex>(gpublasHandle_t handle,        // handle
@@ -215,7 +222,8 @@ std::vector<double> gemm<gpuDoubleComplex, gpuFloatComplex, gpuDoubleComplex>(gp
                          const size_t ldc,                // leading dimension
                          const unsigned num_moduli,       // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,             // false (accurate-mode) or true (fast-mode)
-                         void *const work);               // workspace allocated in advance
+                         void *const work,               // workspace allocated in advance
+                         const computeType_t computeType);
 
 template <>
 std::vector<double> gemm<gpuFloatComplex, gpuDoubleComplex, gpuDoubleComplex>(gpublasHandle_t handle,        // handle
@@ -234,7 +242,8 @@ std::vector<double> gemm<gpuFloatComplex, gpuDoubleComplex, gpuDoubleComplex>(gp
                          const size_t ldc,                // leading dimension
                          const unsigned num_moduli,       // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,             // false (accurate-mode) or true (fast-mode)
-                         void *const work);               // workspace allocated in advance
+                         void *const work,               // workspace allocated in advance
+                         const computeType_t computeType);
 
 template <>
 std::vector<double> gemm<gpuDoubleComplex, gpuFloatComplex, gpuFloatComplex>(gpublasHandle_t handle,        // handle
@@ -253,7 +262,8 @@ std::vector<double> gemm<gpuDoubleComplex, gpuFloatComplex, gpuFloatComplex>(gpu
                          const size_t ldc,                // leading dimension
                          const unsigned num_moduli,       // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,             // false (accurate-mode) or true (fast-mode)
-                         void *const work);               // workspace allocated in advance
+                         void *const work,               // workspace allocated in advance
+                         const computeType_t computeType);
 
 template <>
 std::vector<double> gemm<gpuFloatComplex, gpuDoubleComplex, gpuFloatComplex>(gpublasHandle_t handle,        // handle
@@ -272,6 +282,7 @@ std::vector<double> gemm<gpuFloatComplex, gpuDoubleComplex, gpuFloatComplex>(gpu
                          const size_t ldc,                // leading dimension
                          const unsigned num_moduli,       // #moduli, 2 <= num_moduli <= 20
                          const bool fastmode,             // false (accurate-mode) or true (fast-mode)
-                         void *const work);               // workspace allocated in advance
+                         void *const work,               // workspace allocated in advance
+                         const computeType_t computeType);
 
 } // namespace gemmul8
