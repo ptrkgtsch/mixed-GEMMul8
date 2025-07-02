@@ -82,30 +82,23 @@ void add_int8_mat(const unsigned i,
     }
 }
 
-__global__ void sub_int32_mat_kernel(const size_t m,                         //
-                                     const size_t k,                         //
+__global__ void sub_int32_mat_kernel(const size_t sizeMat,
                                      int32_t *const __restrict__ A32i,       // m*k matrix
-                                     const int32_t *const __restrict__ B32i, // m*k matrix
-                                     const size_t ld32i)                     // leading dimension
+                                     const int32_t *const __restrict__ B32i) // m*k matrix
 {
     const auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= m * k) return;
-    const auto col = idx / m;
-    const auto row = idx - col * m;
-    const auto mem_idx = col * ld32i + row;
+    if (idx >= sizeMat) return;
 
-    A32i[mem_idx] -= B32i[mem_idx];
+    A32i[idx] -= B32i[idx];
 }
 
-void sub_int32_mat(const size_t m,                         //
-                   const size_t k,                         //
+void sub_int32_mat(const size_t sizeMat,
                    int32_t *const __restrict__ A32i,       // m*k matrix
-                   const int32_t *const __restrict__ B32i, // m*k matrix
-                   const size_t ld32i)                     // leading dimension
+                   const int32_t *const __restrict__ B32i) // m*k matrix
 {
     const size_t blockSize = oz2_const::threads_invscaling;
-    const size_t numBlocks = (m * k + blockSize - 1) / blockSize;
-    sub_int32_mat_kernel<<<numBlocks, blockSize>>>(m, k, A32i, B32i, ld32i);
+    const size_t numBlocks = (sizeMat + blockSize - 1) / blockSize;
+    sub_int32_mat_kernel<<<numBlocks, blockSize>>>(sizeMat, A32i, B32i);
 }
 
 }

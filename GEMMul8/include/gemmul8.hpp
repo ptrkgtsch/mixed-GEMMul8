@@ -7,6 +7,7 @@ namespace gemmul8 {
 typedef enum {
     REAL_DEFAULT,
     COMPLEX_BIG_MATRIX_ENCODE,
+    COMPLEX_CLASSIC_MULT,
     COMPLEX_KARATSUBA_MULT
 } computeType_t;
 
