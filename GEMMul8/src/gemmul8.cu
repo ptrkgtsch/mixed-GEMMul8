@@ -73,12 +73,12 @@ size_t workSize_bigmatrix(const size_t m,            // size(A,1) & size(C,1) <=
 #endif
     const size_t ldb8i     = lda8i;
     const size_t sizeA     = lda8i * m2_pad;
-    const size_t sizeB     = ldb8i * 2 * n;
+    const size_t sizeB     = ldb8i * n;
     const size_t sizeC     = ((m2_pad * n + 15) >> 4) << 4;
 #if defined(__HIPCC__)
-    const size_t sizeC32i  = m % 512 == 0 ? ((2 * (m+1) * 2 * n + 15) >> 4) << 4 : ((m2_pad * 2 * n + 15) >> 4) << 4;
+    const size_t sizeC32i  = m % 512 == 0 ? ((2 * (m+1) * n + 15) >> 4) << 4 : ((m2_pad * n + 15) >> 4) << 4;
 #else
-    const size_t sizeC32i  = ((m2_pad * 2 * n + 15) >> 4) << 4;
+    const size_t sizeC32i  = ((m2_pad * n + 15) >> 4) << 4;
 #endif
     const size_t size_vecA = (((m + 15) >> 4) << 4); // multiple of 16
     const size_t size_vecB = (((n + 15) >> 4) << 4); // multiple of 16
@@ -622,9 +622,9 @@ std::vector<double> gemm_mixed_bigmatrix(gpublasHandle_t handle,        // handl
     const size_t sizeB       = ldb8i * n;
     const size_t sizeC       = ((m2_pad * n + 15) >> 4) << 4; // multiple of 16
 #if defined(__HIPCC__)
-    const size_t sizeC32i    = m % 512 == 0 ? ((2 * (m+1) * 2 * n + 15) >> 4) << 4 :((m2_pad * 2 * n + 15) >> 4) << 4 ;
+    const size_t sizeC32i    = m % 512 == 0 ? ((2 * (m+1) * n + 15) >> 4) << 4 :((m2_pad * n + 15) >> 4) << 4 ;
 #else
-    const size_t sizeC32i    = ((m2_pad * 2 * n + 15) >> 4) << 4; // multiple of 16
+    const size_t sizeC32i    = ((m2_pad * n + 15) >> 4) << 4; // multiple of 16
 #endif
     const size_t size_vecA   = (((m + 15) >> 4) << 4);   // multiple of 16
     const unsigned table_idx = num_moduli - 2;
@@ -648,7 +648,7 @@ std::vector<double> gemm_mixed_bigmatrix(gpublasHandle_t handle,        // handl
 #else
     oz2_const::threads_scaling    = 128;
     oz2_const::threads_conv32i8u  = 256;
-    oz2_const::threads_invscaling = 512;
+    oz2_const::threads_invscaling = 256;
 #endif
     oz2_const::grids_invscaling = (m * n + oz2_const::threads_invscaling - 1) / oz2_const::threads_invscaling;
     oz2_const::grids_conv32i8u  = ((sizeC >> 2) + oz2_const::threads_conv32i8u - 1) / oz2_const::threads_conv32i8u;
@@ -778,7 +778,6 @@ std::vector<double> gemm_mixed_kara(gpublasHandle_t handle,        // handle
     const bool is_numM_1     = numM == 1 || std::is_same_v<TC, gpuFloatComplex>;
     constexpr int32_t one    = 1;
     constexpr int32_t zero   = 0;
-    constexpr int32_t m_one  = -1;
     constexpr int32_t m_two  = -2;
 
 #if GEMMul8_ARCH < 89
@@ -947,7 +946,6 @@ std::vector<double> gemm_mixed_classic(gpublasHandle_t handle,        // handle
     constexpr int32_t one    = 1;
     constexpr int32_t zero   = 0;
     constexpr int32_t m_one  = -1;
-    constexpr int32_t m_two  = -2;
 
 #if GEMMul8_ARCH < 89
     oz2_const::threads_scaling    = 256;
