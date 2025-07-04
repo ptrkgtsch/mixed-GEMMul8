@@ -137,7 +137,7 @@ size_t workSize(const size_t m,            // size(A,1) & size(C,1) <= 2^17
             return workSize_real(m, n, k, num_moduli);
         case COMPLEX_BIG_MATRIX_ENCODE:
             return workSize_bigmatrix(m, n, k, num_moduli);
-        case COMPLEX_KARATSUBA_MULT:
+        case COMPLEX_CLASSIC_MULT: case COMPLEX_KARATSUBA_MULT:
             return workSize_kara(m, n, k, num_moduli);
         default: {
             fprintf(stderr, "Unknown compute type\n");
