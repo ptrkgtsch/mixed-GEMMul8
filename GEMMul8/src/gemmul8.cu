@@ -50,7 +50,7 @@ size_t workSize_real(const size_t m,            // size(A,1) & size(C,1) <= 2^17
     const size_t size_vecB = (((n + 15) >> 4) << 4); // multiple of 16
 
     size_t total_size = 0;
-    total_size += sizeof(int8_t) * (sizeA + sizeB) * num_moduli;
+    total_size += sizeof(int8_t) * (sizeA + sizeB);
     total_size += sizeof(uint8_t) * sizeC * num_moduli;
     total_size += sizeof(int32_t) * sizeC32i;
     total_size += sizeof(int16_t) * (size_vecA + size_vecB);
@@ -84,7 +84,7 @@ size_t workSize_bigmatrix(const size_t m,            // size(A,1) & size(C,1) <=
     const size_t size_vecB = (((n + 15) >> 4) << 4); // multiple of 16
 
     size_t total_size = 0;
-    total_size += sizeof(int8_t) * (sizeA + sizeB) * num_moduli;
+    total_size += sizeof(int8_t) * (sizeA + sizeB);
     total_size += sizeof(uint8_t) * sizeC * num_moduli;
     total_size += sizeof(int32_t) * sizeC32i;
     total_size += sizeof(int16_t) * (size_vecA + size_vecB);
@@ -118,7 +118,7 @@ size_t workSize_kara(const size_t m,            // size(A,1) & size(C,1) <= 2^17
     const size_t size_vecB = (((n + 15) >> 4) << 4); // multiple of 16
 
     size_t total_size = 0;
-    total_size += sizeof(int8_t) * (sizeA + sizeB) * num_moduli * 2;
+    total_size += sizeof(int8_t) * (sizeA + sizeB) * 2;
     total_size += sizeof(uint8_t) * sizeC * num_moduli * 2;
     total_size += sizeof(int32_t) * sizeC32i * 2;
     total_size += sizeof(int16_t) * (size_vecA + size_vecB);
@@ -227,8 +227,8 @@ std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
     // set workspace (16byte align)
     //------------------------------
     int8_t *A8i   = reinterpret_cast<int8_t *>(work);                      // lda8i*m*sizeod(int8_t)*num_moduli
-    int8_t *B8i   = A8i + sizeA * num_moduli;                              // ldb8i*n*sizeod(int8_t)*num_moduli
-    uint8_t *C8u  = reinterpret_cast<uint8_t *>(B8i + sizeB * num_moduli); // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
+    int8_t *B8i   = A8i + sizeA;                                           // ldb8i*n*sizeod(int8_t)*num_moduli
+    uint8_t *C8u  = reinterpret_cast<uint8_t *>(B8i + sizeB);              // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
     int32_t *C32i = reinterpret_cast<int32_t *>(C8u + sizeC * num_moduli); // (m*n+15)/16*16*sizeof(int32_t)
     int16_t *sftA = reinterpret_cast<int16_t *>(C32i + sizeC32i);          // (m+15)/16*16*sizeof(int16_t)
     int16_t *sftB = sftA + size_vecA;                                      // (n+15)/16*16*sizeof(int16_t)
@@ -244,25 +244,31 @@ std::vector<double> gemm<double>(gpublasHandle_t handle,        // handle
     // Scaling
     // A =: diag(2^sftA) * A64f, A64f is integer
     // B =: B64f * diag(2^sftB), B64f is integer
-    // Then, calculating mod for all moduli
-    // A8i := A64f - round(A64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
-    // B8i := B64f - round(B64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
     //------------------------------
     timing_start(timetmp);
     if (fastmode) {
-        oz2_util::vecnorm::scaling<double>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, table_idx);
+        oz2_util::vecnorm::compute_sfts<double>(op_A, op_B, m, n, k, A, lda, B, ldb, sftA, sftB, table_idx);
     } else {
-        oz2_util::int8tc::scaling<double>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, C32i, table_idx);
+        oz2_util::int8tc::compute_sfts<double>(handle, op_A, op_B, m, n, k, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
     }
     timing_stop(timetmp, timer[0]);
 
     for (unsigned i = 0; i < num_moduli; ++i) {
+        //------------------------------
+        // Calculating mod for all moduli
+        // A8i := A64f - round(A64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
+        // B8i := B64f - round(B64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
+        //------------------------------
+        timing_start(timetmp);
+        oz2_util::scaling<double>(i, op_A, op_B, m, n, k, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB);
+        timing_stop(timetmp, timer[0]);
+
         //-----------------------------
         // Error-free matrix multiplication
         // C32i := A8i*B8i
         //------------------------------
         timing_start(timetmp);
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i, GPU_R_8I, lda8i, B8i, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         timing_stop(timetmp, timer[1]);
 
         //------------------------------
@@ -370,8 +376,8 @@ std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
     // set workspace (16byte align)
     //------------------------------
     int8_t *A8i   = reinterpret_cast<int8_t *>(work);                      // lda8i*m*sizeod(int8_t)*num_moduli
-    int8_t *B8i   = A8i + sizeA * num_moduli;                              // ldb8i*n*sizeod(int8_t)*num_moduli
-    uint8_t *C8u  = reinterpret_cast<uint8_t *>(B8i + sizeB * num_moduli); // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
+    int8_t *B8i   = A8i + sizeA;                                           // ldb8i*n*sizeod(int8_t)*num_moduli
+    uint8_t *C8u  = reinterpret_cast<uint8_t *>(B8i + sizeB);              // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
     int32_t *C32i = reinterpret_cast<int32_t *>(C8u + sizeC * num_moduli); // (m*n+15)/16*16*sizeof(int32_t)
     int16_t *sftA = reinterpret_cast<int16_t *>(C32i + sizeC32i);          // (m+15)/16*16*sizeof(int16_t)
     int16_t *sftB = sftA + size_vecA;                                      // (n+15)/16*16*sizeof(int16_t)
@@ -383,25 +389,31 @@ std::vector<double> gemm<float>(gpublasHandle_t handle,        // handle
     // Scaling
     // A =: diag(2^sftA) * A64f, A64f is integer
     // B =: B64f * diag(2^sftB), B64f is integer
-    // Then, calculating mod for all moduli
-    // A8i := mod(A64f, modulus[i]) - 128 (-128 <= A8i <= 127)
-    // B8i := mod(B64f, modulus[i]) - 128 (-128 <= A8i <= 127)
     //------------------------------
     timing_start(timetmp);
     if (fastmode) {
-        oz2_util::vecnorm::scaling<float>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, table_idx);
+        oz2_util::vecnorm::compute_sfts<float>(op_A, op_B, m, n, k, A, lda, B, ldb, sftA, sftB, table_idx);
     } else {
-        oz2_util::int8tc::scaling<float>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, C32i, table_idx);
+        oz2_util::int8tc::compute_sfts<float>(handle, op_A, op_B, m, n, k, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
     }
     timing_stop(timetmp, timer[0]);
 
     for (unsigned i = 0; i < num_moduli; ++i) {
+        //------------------------------
+        // Calculating mod for all moduli
+        // A8i := mod(A64f, modulus[i]) - 128 (-128 <= A8i <= 127)
+        // B8i := mod(B64f, modulus[i]) - 128 (-128 <= A8i <= 127)
+        //------------------------------
+        timing_start(timetmp);
+        oz2_util::scaling<float>(i, op_A, op_B, m, n, k, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB);
+        timing_stop(timetmp, timer[0]);
+
         //-----------------------------
         // Error-free matrix multiplication
         // C32i := A8i*B8i
         //------------------------------
         timing_start(timetmp);
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i, GPU_R_8I, lda8i, B8i, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         timing_stop(timetmp, timer[1]);
 
         //------------------------------
@@ -511,8 +523,8 @@ std::vector<double> gemm_mixed(gpublasHandle_t handle,          // handle
     // set workspace (16byte align)
     //------------------------------
     int8_t *A8i   = reinterpret_cast<int8_t *>(work);                      // lda8i*m*sizeod(int8_t)*num_moduli
-    int8_t *B8i   = A8i + sizeA * num_moduli;                              // ldb8i*n*sizeod(int8_t)*num_moduli
-    uint8_t *C8u  = reinterpret_cast<uint8_t *>(B8i + sizeB * num_moduli); // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
+    int8_t *B8i   = A8i + sizeA;                                           // ldb8i*n*sizeod(int8_t)*num_moduli
+    uint8_t *C8u  = reinterpret_cast<uint8_t *>(B8i + sizeB);              // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
     int32_t *C32i = reinterpret_cast<int32_t *>(C8u + sizeC * num_moduli); // (m*n+15)/16*16*sizeof(int32_t)
     int16_t *sftA = reinterpret_cast<int16_t *>(C32i + sizeC32i);          // (m+15)/16*16*sizeof(int16_t)
     int16_t *sftB = sftA + size_vecA;                                      // (n+15)/16*16*sizeof(int16_t)
@@ -529,25 +541,31 @@ std::vector<double> gemm_mixed(gpublasHandle_t handle,          // handle
     // Scaling
     // A =: diag(2^sftA) * A64f, A64f is integer
     // B =: B64f * diag(2^sftB), B64f is integer
-    // Then, calculating mod for all moduli
-    // A8i := A64f - round(A64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
-    // B8i := B64f - round(B64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
     //------------------------------
     timing_start(timetmp);
     if (fastmode) {
-        oz2_util::vecnorm::scaling<TA, TB>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, table_idx);
+        oz2_util::vecnorm::compute_sfts<TA, TB>(op_A, op_B, m, n, k, A, lda, B, ldb, sftA, sftB, table_idx);
     } else {
-        oz2_util::int8tc::scaling<TA, TB>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, C32i, table_idx);
+        oz2_util::int8tc::compute_sfts<TA, TB>(handle, op_A, op_B, m, n, k, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
     }
     timing_stop(timetmp, timer[0]);
 
     for (unsigned i = 0; i < num_moduli; ++i) {
+        //------------------------------
+        // Calculating mod for all moduli
+        // A8i := A64f - round(A64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
+        // B8i := B64f - round(B64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
+        //------------------------------
+        timing_start(timetmp);
+        oz2_util::scaling<TA, TB>(i, op_A, op_B, m, n, k, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB);
+        timing_stop(timetmp, timer[0]);
+
         //-----------------------------
         // Error-free matrix multiplication
         // C32i := A8i*B8i
         //------------------------------
         timing_start(timetmp);
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i, GPU_R_8I, lda8i, B8i, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         timing_stop(timetmp, timer[1]);
 
         //------------------------------
@@ -657,8 +675,8 @@ std::vector<double> gemm_mixed_bigmatrix(gpublasHandle_t handle,        // handl
     // set workspace (16byte align)
     //------------------------------
     int8_t *A8i   = reinterpret_cast<int8_t *>(work);                      // lda8i*m*sizeod(int8_t)*num_moduli
-    int8_t *B8i   = A8i + sizeA * num_moduli;                              // ldb8i*n*sizeod(int8_t)*num_moduli
-    uint8_t *C8u  = reinterpret_cast<uint8_t *>(B8i + sizeB * num_moduli); // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
+    int8_t *B8i   = A8i + sizeA;                                           // ldb8i*n*sizeod(int8_t)*num_moduli
+    uint8_t *C8u  = reinterpret_cast<uint8_t *>(B8i + sizeB);              // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
     int32_t *C32i = reinterpret_cast<int32_t *>(C8u + sizeC * num_moduli); // (m*n+15)/16*16*sizeof(int32_t)
     int16_t *sftA = reinterpret_cast<int16_t *>(C32i + sizeC32i);          // (m+15)/16*16*sizeof(int16_t)
     int16_t *sftB = sftA + size_vecA;                                      // (n+15)/16*16*sizeof(int16_t)
@@ -675,25 +693,31 @@ std::vector<double> gemm_mixed_bigmatrix(gpublasHandle_t handle,        // handl
     // Scaling
     // A =: diag(2^sftA) * A64f, A64f is integer
     // B =: B64f * diag(2^sftB), B64f is integer
-    // Then, calculating mod for all moduli
-    // A8i := A64f - round(A64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
-    // B8i := B64f - round(B64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
     //------------------------------
     timing_start(timetmp);
     if (fastmode) {
-        oz2_util::vecnorm::scaling_bigmatrix<TA, TB>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m2_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, table_idx);
+        oz2_util::vecnorm::compute_sfts<TA, TB>(op_A, op_B, m, n, k, A, lda, B, ldb, sftA, sftB, table_idx);
     } else {
-        oz2_util::int8tc::scaling_bigmatrix<TA, TB>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i, lda8i, lda8i * m2_pad, sftA, B8i, ldb8i, ldb8i * n, sftB, C32i, table_idx);
+        oz2_util::int8tc::compute_sfts_bigmatrix<TA, TB>(handle, op_A, op_B, m, n, k, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB, C32i, table_idx);
     }
     timing_stop(timetmp, timer[0]);
 
     for (unsigned i = 0; i < num_moduli; ++i) {
+        //------------------------------
+        // Calculating mod for all moduli
+        // A8i := A64f - round(A64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
+        // B8i := B64f - round(B64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
+        //------------------------------
+        timing_start(timetmp);
+        oz2_util::scaling_bigmatrix<TA, TB>(i, op_A, op_B, m, n, k, A, lda, B, ldb, A8i, lda8i, sftA, B8i, ldb8i, sftB);
+        timing_stop(timetmp, timer[0]);
+
         //-----------------------------
         // Error-free matrix multiplication
         // C32i := A8i*B8i
         //------------------------------
         timing_start(timetmp);
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m2_pad, n, lda8i, &one, A8i + i * sizeA, GPU_R_8I, lda8i, B8i + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m2_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m2_pad, n, lda8i, &one, A8i, GPU_R_8I, lda8i, B8i, GPU_R_8I, ldb8i, &zero, C32i, GPU_R_32I, m2_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         timing_stop(timetmp, timer[1]);
 
         //------------------------------
@@ -804,10 +828,10 @@ std::vector<double> gemm_mixed_kara(gpublasHandle_t handle,        // handle
     // set workspace (16byte align)
     //------------------------------
     int8_t *A8i_real   = reinterpret_cast<int8_t *>(work);                      // lda8i*m*sizeod(int8_t)*num_moduli
-    int8_t *A8i_imag   = A8i_real + sizeA * num_moduli;                              // lda8i*m*sizeod(int8_t)*num_moduli
-    int8_t *B8i_real   = A8i_imag + sizeA * num_moduli;                              // ldb8i*n*sizeod(int8_t)*num_moduli
-    int8_t *B8i_imag   = B8i_real + sizeB * num_moduli;                              // ldb8i*n*sizeod(int8_t)*num_moduli
-    uint8_t *C8u_real  = reinterpret_cast<uint8_t *>(B8i_imag + sizeB * num_moduli); // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
+    int8_t *A8i_imag   = A8i_real + sizeA;                                      // lda8i*m*sizeod(int8_t)*num_moduli
+    int8_t *B8i_real   = A8i_imag + sizeA;                                      // ldb8i*n*sizeod(int8_t)*num_moduli
+    int8_t *B8i_imag   = B8i_real + sizeB;                                      // ldb8i*n*sizeod(int8_t)*num_moduli
+    uint8_t *C8u_real  = reinterpret_cast<uint8_t *>(B8i_imag + sizeB);         // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
     uint8_t *C8u_imag  = C8u_real + sizeC * num_moduli;
     int32_t *C32i_real = reinterpret_cast<int32_t *>(C8u_imag + sizeC * num_moduli); // (m*n+15)/16*16*sizeof(int32_t)
     int32_t *C32i_imag = C32i_real + sizeC32i;
@@ -826,19 +850,25 @@ std::vector<double> gemm_mixed_kara(gpublasHandle_t handle,        // handle
     // Scaling
     // A =: diag(2^sftA) * A64f, A64f is integer
     // B =: B64f * diag(2^sftB), B64f is integer
-    // Then, calculating mod for all moduli
-    // A8i := A64f - round(A64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
-    // B8i := B64f - round(B64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
     //------------------------------
     timing_start(timetmp);
     if (fastmode) {
-        oz2_util::vecnorm::scaling_kara<TA, TB>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i_real, A8i_imag, lda8i, lda8i * m_pad, sftA, B8i_real, B8i_imag, ldb8i, ldb8i * n, sftB, table_idx);
+        oz2_util::vecnorm::compute_sfts<TA, TB>(op_A, op_B, m, n, k, A, lda, B, ldb, sftA, sftB, table_idx);
     } else {
-        oz2_util::int8tc::scaling_kara<TA, TB>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i_real, A8i_imag, lda8i, lda8i * m_pad, sftA, B8i_real, B8i_imag, ldb8i, ldb8i * n, sftB, C32i_real, C32i_imag, table_idx);
+        oz2_util::int8tc::compute_sfts_kara<TA, TB>(handle, op_A, op_B, m, n, k, A, lda, B, ldb, A8i_real, A8i_imag, lda8i, sftA, B8i_real, B8i_imag, ldb8i, sftB, C32i_real, C32i_imag, table_idx);
     }
     timing_stop(timetmp, timer[0]);
 
     for (unsigned i = 0; i < num_moduli; ++i) {
+        //------------------------------
+        // Calculating mod for all moduli
+        // A8i := A64f - round(A64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
+        // B8i := B64f - round(B64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
+        //------------------------------
+        timing_start(timetmp);
+        oz2_util::scaling_kara<TA, TB>(i, op_A, op_B, m, n, k, A, lda, B, ldb, A8i_real, A8i_imag, lda8i, sftA, B8i_real, B8i_imag, ldb8i, sftB);
+        timing_stop(timetmp, timer[0]);
+
         //-----------------------------
         // Error-free matrix multiplication
         // C32i := A8i*B8i
@@ -846,17 +876,17 @@ std::vector<double> gemm_mixed_kara(gpublasHandle_t handle,        // handle
         timing_start(timetmp);
 
         // E = Re(A)Re(B)
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_real + i * sizeA, GPU_R_8I, lda8i, B8i_real + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i_real, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_real, GPU_R_8I, lda8i, B8i_real, GPU_R_8I, ldb8i, &zero, C32i_real, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         // F = Im(A)Im(B)
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_imag + i * sizeA, GPU_R_8I, lda8i, B8i_imag + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i_imag, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_imag, GPU_R_8I, lda8i, B8i_imag, GPU_R_8I, ldb8i, &zero, C32i_imag, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         // G1 = Re(A) + Im(A)
-        oz2_mat_utils::add_int8_mat(i, sizeA, A8i_real + i * sizeA, A8i_imag + i * sizeA);
+        oz2_mat_utils::add_int8_mat(i, sizeA, A8i_real, A8i_imag);
         // G2 = Re(B) + Im(B)
-        oz2_mat_utils::add_int8_mat(i, sizeB, B8i_real + i * sizeB, B8i_imag + i * sizeB);
+        oz2_mat_utils::add_int8_mat(i, sizeB, B8i_real, B8i_imag);
         // C32i_real = E - F
         oz2_mat_utils::sub_int32_mat(sizeC32i, C32i_real, C32i_imag);
         // C32i_imag = G1 * G2 - 2F
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_real + i * sizeA, GPU_R_8I, lda8i, B8i_real + i * sizeB, GPU_R_8I, ldb8i, &m_two, C32i_imag, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_real, GPU_R_8I, lda8i, B8i_real, GPU_R_8I, ldb8i, &m_two, C32i_imag, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         // C32i_imag = G1 * G2 - E - F
         oz2_mat_utils::sub_int32_mat(sizeC32i, C32i_imag, C32i_real);
 
@@ -971,10 +1001,10 @@ std::vector<double> gemm_mixed_classic(gpublasHandle_t handle,        // handle
     // set workspace (16byte align)
     //------------------------------
     int8_t *A8i_real   = reinterpret_cast<int8_t *>(work);                      // lda8i*m*sizeod(int8_t)*num_moduli
-    int8_t *A8i_imag   = A8i_real + sizeA * num_moduli;                              // lda8i*m*sizeod(int8_t)*num_moduli
-    int8_t *B8i_real   = A8i_imag + sizeA * num_moduli;                              // ldb8i*n*sizeod(int8_t)*num_moduli
-    int8_t *B8i_imag   = B8i_real + sizeB * num_moduli;                              // ldb8i*n*sizeod(int8_t)*num_moduli
-    uint8_t *C8u_real  = reinterpret_cast<uint8_t *>(B8i_imag + sizeB * num_moduli); // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
+    int8_t *A8i_imag   = A8i_real + sizeA;                                      // lda8i*m*sizeod(int8_t)*num_moduli
+    int8_t *B8i_real   = A8i_imag + sizeA;                                      // ldb8i*n*sizeod(int8_t)*num_moduli
+    int8_t *B8i_imag   = B8i_real + sizeB;                                      // ldb8i*n*sizeod(int8_t)*num_moduli
+    uint8_t *C8u_real  = reinterpret_cast<uint8_t *>(B8i_imag + sizeB);         // (m*n+15)/16*16*sizeof(uint8_t)*num_moduli
     uint8_t *C8u_imag  = C8u_real + sizeC * num_moduli;
     int32_t *C32i_real = reinterpret_cast<int32_t *>(C8u_imag + sizeC * num_moduli); // (m*n+15)/16*16*sizeof(int32_t)
     int32_t *C32i_imag = C32i_real + sizeC32i;
@@ -993,19 +1023,25 @@ std::vector<double> gemm_mixed_classic(gpublasHandle_t handle,        // handle
     // Scaling
     // A =: diag(2^sftA) * A64f, A64f is integer
     // B =: B64f * diag(2^sftB), B64f is integer
-    // Then, calculating mod for all moduli
-    // A8i := A64f - round(A64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
-    // B8i := B64f - round(B64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
     //------------------------------
     timing_start(timetmp);
     if (fastmode) {
-        oz2_util::vecnorm::scaling_kara<TA, TB>(op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i_real, A8i_imag, lda8i, lda8i * m_pad, sftA, B8i_real, B8i_imag, ldb8i, ldb8i * n, sftB, table_idx);
+        oz2_util::vecnorm::compute_sfts<TA, TB>(op_A, op_B, m, n, k, A, lda, B, ldb, sftA, sftB, table_idx);
     } else {
-        oz2_util::int8tc::scaling_kara<TA, TB>(handle, op_A, op_B, m, n, k, num_moduli, A, lda, B, ldb, A8i_real, A8i_imag, lda8i, lda8i * m_pad, sftA, B8i_real, B8i_imag, ldb8i, ldb8i * n, sftB, C32i_real, C32i_imag, table_idx);
+        oz2_util::int8tc::compute_sfts_kara<TA, TB>(handle, op_A, op_B, m, n, k, A, lda, B, ldb, A8i_real, A8i_imag, lda8i, sftA, B8i_real, B8i_imag, ldb8i, sftB, C32i_real, C32i_imag, table_idx);
     }
     timing_stop(timetmp, timer[0]);
 
     for (unsigned i = 0; i < num_moduli; ++i) {
+        //------------------------------
+        // Calculating mod for all moduli
+        // A8i := A64f - round(A64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
+        // B8i := B64f - round(B64f/modulus[i])*modulus[i] (-128 <= A8i <= 127)
+        //------------------------------
+        timing_start(timetmp);
+        oz2_util::scaling_kara<TA, TB>(i, op_A, op_B, m, n, k, A, lda, B, ldb, A8i_real, A8i_imag, lda8i, sftA, B8i_real, B8i_imag, ldb8i, sftB);
+        timing_stop(timetmp, timer[0]);
+
         //-----------------------------
         // Error-free matrix multiplication
         // C32i := A8i*B8i
@@ -1013,14 +1049,14 @@ std::vector<double> gemm_mixed_classic(gpublasHandle_t handle,        // handle
         timing_start(timetmp);
 
         // F = Im(A)Im(B)
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_imag + i * sizeA, GPU_R_8I, lda8i, B8i_imag + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i_real, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_imag, GPU_R_8I, lda8i, B8i_imag, GPU_R_8I, ldb8i, &zero, C32i_real, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         // C32i_real = Re(A)Re(B) - F
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_real + i * sizeA, GPU_R_8I, lda8i, B8i_real + i * sizeB, GPU_R_8I, ldb8i, &m_one, C32i_real, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_real, GPU_R_8I, lda8i, B8i_real, GPU_R_8I, ldb8i, &m_one, C32i_real, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
 
         // H = Im(A)Re(B)
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_imag + i * sizeA, GPU_R_8I, lda8i, B8i_real + i * sizeB, GPU_R_8I, ldb8i, &zero, C32i_imag, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_imag, GPU_R_8I, lda8i, B8i_real, GPU_R_8I, ldb8i, &zero, C32i_imag, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
         // C32i_imag = Re(A)Im(B) + H
-        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_real + i * sizeA, GPU_R_8I, lda8i, B8i_imag + i * sizeB, GPU_R_8I, ldb8i, &one, C32i_imag, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
+        gpublasGemmEx(handle, GPUBLAS_OP_T, GPUBLAS_OP_N, m_pad, n, lda8i, &one, A8i_real, GPU_R_8I, lda8i, B8i_imag, GPU_R_8I, ldb8i, &one, C32i_imag, GPU_R_32I, m_pad, GPUBLAS_COMPUTE_32I, GPUBLAS_GEMM_DEFAULT);
 
         timing_stop(timetmp, timer[1]);
 
