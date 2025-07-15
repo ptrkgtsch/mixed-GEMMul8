@@ -3113,7 +3113,7 @@ __inline__ void scaling(gpublasHandle_t handle,        // handle
     gpuDeviceSynchronize();
 #if defined(__HIPCC__)
     const size_t m_pad = m;
-    const size_t ldc32i = m_pad % 1024 == 0 ? m_pad + 4 : m_pad;
+    const size_t ldc32i = m_pad % 1024 == 0 ? m_pad + 1 : m_pad;
 #else
     const size_t m_pad = ((m + 3) >> 2) << 2;
     const size_t ldc32i = m_pad;
