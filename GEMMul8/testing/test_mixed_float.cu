@@ -599,7 +599,6 @@ void watt_check(std::string &deviceName, std::string &dateTime) {
         gpuMalloc(&workd_gpu, (m * k + k * n + m * n) * sizeof(double));
         double *devBd = reinterpret_cast<double *>(workd_gpu);;
         double *devCd = devBd + k * n;
-        makemat::f2d(m, k, devAf, devAd);
         makemat::f2d(k, n, devBf, devBd);
 
         double alpha = 1.0;
